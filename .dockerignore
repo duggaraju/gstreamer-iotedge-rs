@@ -1,4 +1,4 @@
 .git
 target/
 src/
-!target/release
+!target/release/*
