@@ -33,6 +33,7 @@
 
       function onAddRemoteStream(event) {
         html5VideoElement.srcObject = event.streams[0];
+        //html5VideoElement.play();
       }
 
 
@@ -102,7 +103,7 @@
 
   <body>
     <div>
-      <video id="stream" autoplay controls playsinline>Your browser does not support video</video>
+      <video id="stream" autoplay muted controls playsinline>Your browser does not support video</video>
     </div>
   </body>
 </html>
