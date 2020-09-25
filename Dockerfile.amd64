@@ -6,3 +6,6 @@ RUN apt-get update && apt-get install -y libcurl4 libssl1.1 libuuid1 \
 COPY wwwroot/ wwwroot/
 COPY target/release/gstreamer-iotedge-rs /usr/local/bin/
 CMD ["gstreamer-iotedge-rs"]
+
+EXPOSE 8554/tcp
+EXPOSE 8000/tcp

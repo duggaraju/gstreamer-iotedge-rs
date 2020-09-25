@@ -16,6 +16,7 @@ extern crate serde_derive;
 extern crate gstreamer_webrtc as gst_webrtc;
 extern crate gstreamer_rtsp_server as gst_rtsp_server;
 extern crate azure_iot_rs_sys as azure;
+extern crate ctrlc;
 
 mod plugins;
 
@@ -35,6 +36,7 @@ use std::sync::mpsc::{SyncSender, sync_channel};
 use std::sync::{Arc, Mutex};
 use std::str;
 use std::result::Result;
+use std::process;
 use serde_derive::{Deserialize, Serialize};
 
 use tokio::task;
@@ -681,6 +683,11 @@ async fn http_server() {
 async fn main() {
 
     env_logger::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    ctrlc::set_handler(move || {
+        info!("Terminating on Ctrl+C");
+        process::exit(-1);
+    }).expect("Error setting Ctrl-C handler");
+
     gst::init().unwrap();
     plugin_register_static().unwrap();
     info!("Initialized gstreamer");
