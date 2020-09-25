@@ -3,7 +3,7 @@ An Azure IOT Edge module to run gstreamer pipeline
 
 Read here(https://docs.microsoft.com/en-us/azure/iot-edge/iot-edge-modules) for more information about How Azure IOT edge modules work.
 
-The module can run any gstreamer pipeline that you pass in as part of the module twin settings.  Apart from that it has web server so you can playback DASH/HLS.A websocket server so you can do web RTC playback. An RTSP server to do RTSP playback all integrated together.
+The module can run any gstreamer pipeline that you pass in as part of the module twin settings.  Apart from that, it has web server so you can playback DASH/HLS streams, a websocket server so you can do web RTC playback, an RTSP server to do RTSP playback all integrated together.
 
 # Running a pipeline.
 
@@ -43,7 +43,20 @@ If you have additonal plugins that you want to run.
 
 # RTSP plabyack
 
-* Identity the streams in your pipeline that you want to stream and send them to an appsink with name audio/video. Use tee if needed.
+Just set the rts_pipeline property of your module twin.
+
+example:
+```json
+"properties": {
+    "desired": {
+      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@$IP/axis-media/media.amp name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! appsink name=video max-buffers=30 drop=true src. ! rtpmp4gdepay ! aacparse ! appsink name=audio drop=true max-buffers=30",
+      "rtsp_pipeline": "( rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location='rtsp://$USER:$PASSWORD@$IP/axis-media/media.amp' latency=200 name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! rtph264pay name=pay0 pt=96 src. ! rtpmp4gdepay ! aacparse ! rtpmp4apay name=pay1 pt=97 )",
+      "$metadata": {}
+```
+
+## If you want to share some some of the processing between the main pipeline and the RTSP pipeline...
+
+* Identity the streams in your pipeline that you want to stream and send them to an appsink with name audio/video. Use tee element if needed.
 * Add an rtsp_pipeline with appsrc name audiosrc/videosrc. The app will then pipe the buffers from the sink to the source and use that for playback.
 * The RTSP server is by default running on port 8554. So run something like ffplay rtsp://ipaddres:8554/player to play the stream.
 
@@ -53,7 +66,6 @@ example:
     "desired": {
       "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@IP.ADDRESS/axis-media/media.amp name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! appsink name=video max-buffers=30 drop=true src. ! rtpmp4gdepay ! aacparse ! appsink name=audio drop=true max-buffers=30",
       "rtsp_pipeline": "( appsrc name=videosrc ! h264parse ! rtph264pay config-interval=-1 name=pay0 pt=96 )",
-      "webrtc_pipeline": "webrtcbin name=webrtcbin stun-server=stun://stun.l.google.com:19302 rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWROD@10.91.98.185/axis-media/media.amp ! rtph264depay ! h264parse ! rtph264pay config-interval=-1 name=payloader ! application/x-rtp,media=video,encoding-name=H264,payload=96 ! webrtcbin.",
       "$metadata": {}
 ```
 

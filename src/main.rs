@@ -438,7 +438,6 @@ fn create_pipeline(pipeline: &str) {
 }
 
 fn process_pipeline() {
-
     let guard = CONTEXT.lock().unwrap();
     let bus = (*guard).pipeline.as_ref().unwrap().get_bus().unwrap();
     drop(guard);
@@ -583,10 +582,13 @@ fn on_media_configure(_: &gst_rtsp_server::RTSPMediaFactory, media: &gst_rtsp_se
 fn rtsp_server(pipeline: String) {
     let main_loop = glib::MainLoop::new(None, false);
 
+    let rtsp_pipeline = shellexpand::env(&pipeline).unwrap();
+    info!("expanded RTSP pipeline: {}", rtsp_pipeline);
+
     let server = gst_rtsp_server::RTSPServer::new();
     let mounts = server.get_mount_points().unwrap();
     let factory = gst_rtsp_server::RTSPMediaFactory::new();
-    factory.set_launch(&pipeline);
+    factory.set_launch(&rtsp_pipeline);
     factory.set_shared(true);
     factory.connect_media_configure(on_media_configure);
     factory.connect_media_constructed(|_, _| { 
@@ -684,6 +686,15 @@ async fn main() {
     info!("Initialized gstreamer");
 
     let server = http_server();
+
+
+    // local testing only.
+    // let pipeline = std::env::var("pipeline").unwrap();
+    // create_pipeline(&pipeline);
+    // task::spawn_blocking(move || { process_pipeline(); });
+    // let rtsp_pipeline = std::env::var("rtsp_pipeline").unwrap();
+    // rtsp_server(rtsp_pipeline);
+
     let iot = task::spawn_blocking(move || { handle_iot(); });
     let _ = join!(server, iot);
 }
