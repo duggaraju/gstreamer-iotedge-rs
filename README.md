@@ -84,21 +84,28 @@ example:
 ```
 
 # Building Code
-Assuming you have rust tooling installed. All you need is
+## Local Build.
+Assuming you have [rust](https://www.rust-lang.org/tools/install) tooling installed. All you need is
 ```sh
 caro build 
 ```
 
-To build the container:
+## To build the container:
 ```sh
 cargoo build --release
-docker build -f Dockerfile.amd64 -t gstreamer-iot .
+docker build -f Dockerfile.amd64 -t gstreamer-iotedge-rs .
 ```
+## Building in a container.
+If you dont want to install anything locally but just build the code and the container.
+```sh
+docker build -f Dockerfile.rust . -t gstreamer-iotedge-rs
+```
+
 Now you can push the continaer to docker hub or any other container registry. And you can register the module in your Azure IOT Hub.
 # What Next ....
 
-Support for sharing pielines between multiple WebRTC clients (Right now each player has its own pipeline)
-Show how  GPU can be use for decoding.
-Write a plugin to analyze the vide frames using some AI Model.
-Write a plugin to save the video to Amzon S3/Azure Blob storage.
-Adding support for certificates for RTSP/WebRTC playback and other authentication support.
+* Support for sharing pielines between multiple WebRTC clients (Right now each player has its own pipeline)
+* Show how  GPU can be use for decoding.
+* Write a plugin to analyze the vide frames using some AI Model.
+* Write a plugin to save the video to Amzon S3/Azure Blob storage.
+* Adding support for certificates for RTSP/WebRTC playback and other authentication support.
