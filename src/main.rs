@@ -262,23 +262,29 @@ impl RtspContext {
             buffer_ref.set_dts(dts);
             let result  = source.push_buffer(copy);
             match result {
-                Ok(_) => { info!("successfully pushed buffer {} {} {} {}", opts,  odts, pts, dts); },
-                Err(err) => { error!("Failed to push buffer {} {} {}", err, pts, dts); }
+                Ok(_) => { info!("successfully pushed buffer {}/{} ==> {}/{}", odts, opts, dts, pts); },
+                Err(err) => { error!("Failed to push buffer {:?} {} {}", err, pts, dts); }
             }
         }
     }
     
-    fn push_buffer(source: &AppSrc, sample: Sample) {
+    fn push_buffer(source: &AppSrc, sample: Sample) -> bool {
         let buffer = sample.get_buffer_owned();
         if let Some(buffer) = buffer {
             let pts = buffer.get_pts();
             let dts = buffer.get_dts();
             let result  = source.push_buffer(buffer);
             match result {
-                Ok(_) => { info!("successfully pushed buffer {} {}", pts, dts); },
-                Err(err) => { error!("Failed to push buffer {} {} {}", err, pts, dts); }
+                Ok(status) => { 
+                    info!("successfully pushed  {:?} {} {}",status, dts, pts);
+                    return true; 
+                },
+                Err(err) => { 
+                    error!("Failed to push buffer {:?} {} {}", err, pts, dts); 
+                }
             };
         }
+        false
     }
     
     fn on_need_data(&self, source: &AppSrc, audio: bool) {
@@ -289,9 +295,16 @@ impl RtspContext {
         };
     
         let appsink = sink.downcast_ref::<AppSink>().unwrap();
-        let sample = appsink.pull_sample();
-        if let Ok(sample) = sample {
-            RtspContext::push_buffer(source, sample);
+        loop {
+            let sample = appsink.pull_sample();
+            if let Ok(sample) = sample {
+                let result = RtspContext::push_buffer(source, sample);
+                if !result {
+                    break;
+                }
+            } else {
+                break;
+            }       
         }
     }
     
@@ -319,7 +332,7 @@ impl RtspContext {
         context.videosrc = bin.get_by_name_recurse_up("videosrc");
         context.audiosrc = bin.get_by_name_recurse_up("audiosrc");    
 
-        if let Some(ref video) = self.videosrc {
+        if let Some(ref video) = context.videosrc {
             let videosrc = video.downcast_ref::<AppSrc>().unwrap();
             if let Some(ref videosink) = context.videosink {
                 context.connect_sink_source(videosink.downcast_ref::<AppSink>().unwrap(), &videosrc);
