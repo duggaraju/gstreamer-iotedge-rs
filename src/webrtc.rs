@@ -2,6 +2,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate gstreamer_webrtc as gst_webrtc;
 
+use std::path::Path;
 use gst::{Bin, Element};
 use gst::prelude::*;
 use gst::gst_element_error;
@@ -42,10 +43,9 @@ enum JsonMsg {
 
 impl WebRtcContext {
         
-    pub fn start_webrtc_pipeline(pipeline: String, sender: SyncSender<Message>) -> anyhow::Result<WebRtcContext> {
-
-        info!("expanding environemnt variables in pipeline: {}", pipeline);
+    pub fn start(pipeline: String, sender: SyncSender<Message>) -> anyhow::Result<WebRtcContext> {
         let expanded_pipeline = shellexpand::env(&pipeline).unwrap();
+        info!("expanded Web RTC  pipeline: {}", expanded_pipeline);
         let mut context = gst::ParseContext::new();
         let element = gst::parse_launch_full(&expanded_pipeline, Some(&mut context), gst::ParseFlags::empty());
         if let Err(err) = element {
@@ -295,82 +295,90 @@ impl WebRtcContext {
     }    
 }
 
-async fn handle_webscoket(pipeline: String, socket: warp::ws::WebSocket) {
 
-    info!("Staring a web socket session for pipeline: {}", pipeline);
-    // let pipeline = String::new();
-    let (mut writer, mut reader) = socket.split();
-    let (sender, receiver) = sync_channel::<Message>(1);
-
-    let send = task::spawn(async move {
-        let webrtc_client = WebRtcContext::start_webrtc_pipeline(pipeline, sender).unwrap();
-        loop {
-            let next = reader.next().await;
-    
-            if let None = next {
-                break;
-            }
-            let msg = next.unwrap().ok();
-    
-            let msg = match msg {
-                Some(msg) => msg,
-                None => {
-                    break;
-                }
-            };
-    
-            if msg.is_text() {
-                info!("received text {}", msg.to_str().unwrap());
-                webrtc_client.process_message(msg).unwrap();
-            }
-        };    
-    });
-
-    task::yield_now().await;
-
-    loop {
-        let message = receiver.recv();
-        if let Err(e) = message {
-            error!("Error sending message {}", e);
-            break;
-        }
-        writer.send(message.unwrap()).await.unwrap();
-    }
-
-    send.await.unwrap();
+#[derive(Debug, Clone)]
+pub struct WebServer {
+    webrtc_pipeline: String
 }
 
-pub async fn http_server(webrtc_pipeline: String) {
+impl WebServer {
+    async fn handle_webscoket(pipeline: String, socket: warp::ws::WebSocket) {
 
-    info!("Initializing HTTP server...");
-
-    let root = warp::path("wwwroot")
-        .and(warp::fs::dir("wwwroot"));    
-
-    let media_path = std::env::var("media_root").unwrap_or(String::from("/tmp"));
-    let media = warp::path("media")
-    .and(warp::fs::dir(media_path));    
-
-    let use_ws = !webrtc_pipeline.is_empty();
-
-    // If web rtc is enabled allow web sockets.
-    let ws = warp::path("ws")
-    .and_then( move || async move {
-        if use_ws {
-            Ok(true)
-        } else {
-            Err(warp::reject::not_found())            
+        info!("Staring a web socket session for pipeline: {}", pipeline);
+        // let pipeline = String::new();
+        let (mut writer, mut reader) = socket.split();
+        let (sender, receiver) = sync_channel::<Message>(1);
+    
+        let send = task::spawn(async move {
+            let webrtc_client = WebRtcContext::start(pipeline, sender).unwrap();
+            loop {
+                let next = reader.next().await;
+        
+                if let None = next {
+                    break;
+                }
+                let msg = next.unwrap().ok();
+        
+                let msg = match msg {
+                    Some(msg) => msg,
+                    None => {
+                        break;
+                    }
+                };
+        
+                if msg.is_text() {
+                    info!("received text {}", msg.to_str().unwrap());
+                    webrtc_client.process_message(msg).unwrap();
+                }
+            };    
+        });
+    
+        task::yield_now().await;
+    
+        loop {
+            let message = receiver.recv();
+            if let Err(e) = message {
+                error!("Error sending message {}", e);
+                break;
+            }
+            writer.send(message.unwrap()).await.unwrap();
         }
-    })
-    .and(warp::ws())
-    .map(move |_, ws: warp::ws::Ws| {
-        let pipeline = webrtc_pipeline.clone();
-        ws.on_upgrade( |ws| async move { handle_webscoket(pipeline, ws).await; })
-    });
-
-    info!("started http server....");
-    let routes = warp::get().and(root.or(media).or(ws));
-    warp::serve(routes)
-    .run(([0, 0, 0, 0], 8000)).await;
+    
+        send.await.unwrap();
+    }
+    
+    pub async fn start(webrtc_pipeline: String) {
+    
+        info!("Initializing HTTP server...");
+        let root_dir = Path::new("wwwroot");
+        let root = warp::path("wwwroot")
+            .and(warp::fs::dir(root_dir));    
+    
+        let media_path = std::env::var("media_root").unwrap_or(String::from("/tmp"));
+        let media = warp::path("media")
+        .and(warp::fs::dir(media_path));    
+    
+        let use_ws = !webrtc_pipeline.is_empty();
+    
+        // If web rtc is enabled allow web sockets.
+        let ws = warp::path("ws")
+        .and_then( move || async move {
+            if use_ws {
+                Ok(true)
+            } else {
+                Err(warp::reject::not_found())            
+            }
+        })
+        .and(warp::ws())
+        .map(move |_, ws: warp::ws::Ws| {
+            let pipeline = webrtc_pipeline.clone();
+            ws.on_upgrade( |ws| async move { WebServer::handle_webscoket(pipeline, ws).await; })
+        });
+    
+        info!("started http server....");
+        let routes = warp::get().and(media.or(ws).or(root));
+        warp::serve(routes)
+        .run(([0, 0, 0, 0], 8000)).await;
+    }    
 }
 

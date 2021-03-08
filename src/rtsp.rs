@@ -1,5 +1,6 @@
 extern crate gstreamer_rtsp_server as gst_rtsp_server;
 
+use crate::media::AppSinks;
 use gst::prelude::*;
 use gst_rtsp_server::prelude::*;
 use gstreamer_app::{AppSrc, AppSink};
@@ -16,11 +17,20 @@ pub struct RtspContext {
 }
 
 impl RtspContext {
-    fn push_buffer_modify_time(source: &AppSrc, sample: Sample) {
-        let buffer = sample.get_buffer();
-        let segment = sample.get_segment().unwrap();
-    
+
+    pub fn new(sinks: AppSinks) -> Self {
+        RtspContext {
+            audiosrc: sinks.audiosink,
+            videosrc: sinks.videosink,
+            audiosink: None,
+            videosink: None
+        }
+    }
+
+    fn push_buffer_modify_time(source: &AppSrc, sample: Sample) -> bool {
+        let buffer = sample.get_buffer();    
         if let Some(ref buffer) = buffer {
+            let segment = sample.get_segment().unwrap();
             let opts = buffer.get_pts();
             let mut pts = opts;
             /* Convert the PTS/DTS to running time so they start from 0 */
@@ -47,11 +57,18 @@ impl RtspContext {
             buffer_ref.set_pts(pts);
             buffer_ref.set_dts(dts);
             let result  = source.push_buffer(copy);
-            match result {
-                Ok(_) => { info!("successfully pushed buffer {}/{} ==> {}/{}", odts, opts, dts, pts); },
-                Err(err) => { error!("Failed to push buffer {:?} {} {}", err, pts, dts); }
+            return match result {
+                Ok(_) => { 
+                    info!("successfully pushed buffer {}/{} ==> {}/{}", odts, opts, dts, pts); 
+                    true
+                },
+                Err(err) => {
+                    error!("Failed to push buffer {:?} {} {}", err, pts, dts); 
+                    false
+                }
             }
         }
+        false
     }
     
     fn push_buffer(source: &AppSrc, sample: Sample) -> bool {
@@ -62,11 +79,11 @@ impl RtspContext {
             let result  = source.push_buffer(buffer);
             match result {
                 Ok(status) => { 
-                    info!("successfully pushed  {:?} {} {}",status, dts, pts);
+                    debug!("successfully pushed  {:?} {}/{}",status, dts, pts);
                     return true; 
                 },
                 Err(err) => { 
-                    error!("Failed to push buffer {:?} {} {}", err, pts, dts); 
+                    error!("Failed to push buffer {:?} {}/{}", err, pts, dts); 
                 }
             };
         }
@@ -99,7 +116,7 @@ impl RtspContext {
         let pads = sink.get_sink_pads();
         for pad in &pads {
             let caps = pad.get_current_caps();
-            info!("Found caps for sink {}", caps.as_ref().unwrap());
+            info!("Found caps for sink {:?}", caps);
             source.set_caps(caps.as_ref());
         }
         let context = self.clone();
@@ -133,7 +150,7 @@ impl RtspContext {
         }
     }
     
-    pub fn rtsp_server(&self, pipeline: &str) {
+    pub fn start(&self, pipeline: &str) {
         let rtsp_pipeline = shellexpand::env(pipeline).unwrap();
         info!("expanded RTSP pipeline: {}", rtsp_pipeline);
     

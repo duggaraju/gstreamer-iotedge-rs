@@ -1,7 +1,7 @@
 use serde_json::{Value};
 
 #[derive(Debug, Clone)]
-pub struct ModuleSettings
+pub struct Settings
 {
     pub pipeline: Option<String>,
     pub rtsp_pipeline: Option<String>,
@@ -9,10 +9,10 @@ pub struct ModuleSettings
     pub http_server: bool
 }
 
-impl ModuleSettings {
+impl Settings {
     pub fn from_json(settings: Value) -> Self {
         let desired = settings["desired"].as_object().expect("Expected desired settings!");
-        ModuleSettings {
+        Settings {
             pipeline: desired.get("pipeline").and_then(|val| val.as_str()).map(String::from),
             rtsp_pipeline: desired.get("rtsp_pipeline").and_then(|val| val.as_str()).map(String::from),
             webrtc_pipeline: desired.get("webrtc_pipeline").and_then(|val| val.as_str()).map(String::from),
@@ -21,7 +21,7 @@ impl ModuleSettings {
     }
 
     pub fn from_env() -> Self {
-        ModuleSettings {
+        Settings {
             pipeline: std::env::var("pipeline").ok(),
             rtsp_pipeline: std::env::var("rtsp_pipeline").ok(),
             webrtc_pipeline: std::env::var("webrtc_pipeline").ok(),

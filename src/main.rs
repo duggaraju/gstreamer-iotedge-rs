@@ -20,15 +20,13 @@ mod settings;
 mod rtsp;
 mod webrtc;
 mod iot;
+mod media;
 
-use crate::webrtc::http_server;
-use crate::settings::ModuleSettings;
-use crate::rtsp::RtspContext;
-use crate::iot::{ModuleContext};
-use std::result::Result;
+use anyhow::{Result, Error};
+use crate::settings::Settings;
+use crate::iot::{IotModule};
+use crate::media::{MediaPipeline};
 use std::process;
-
-use tokio::task;
 
 fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
     plugins::register(plugin)?;
@@ -48,30 +46,33 @@ gst_plugin_define!(
 );
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
 
-    env_logger::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    ctrlc::set_handler(move || {
-        info!("Terminating on Ctrl+C");
-        process::exit(-1);
-    }).expect("Error setting Ctrl-C handler");
-
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     //ensure media root is always set.
     if let None = std::env::var_os("media_root") {
         std::env::set_var("media_root", "/tmp");
     }
 
-    gst::init().unwrap();
-    plugin_register_static().unwrap();
+    gst::init()?;
+    plugin_register_static()?;
     let main_loop = glib::MainLoop::new(None, false);
     info!("Initialized gstreamer");
 
-    // local testing only.
-    // let settings = ModuleSettings::from_env();
-    // let mut context = ModuleContext::new();
-    // context.update(settings);
+    if let Some(_) = std::env::var_os("IOTEDGE_WORKLOADURI") {
+        // We are running as an iot edge module.
+        let _iot = IotModule::start();
+    } else {
+        // Run as a normal container..
+        let settings = Settings::from_env();
+        let mut pipeline = MediaPipeline::new();
+        pipeline.update(settings);
+    }
+    ctrlc::set_handler(move || {
+        info!("Terminating on Ctrl+C");
+        process::exit(-1);
+    }).expect("Error setting Ctrl-C handler");
 
-    let iot = task::spawn_blocking(|| { ModuleContext::handle_iot(); });
     main_loop.run();
-    iot.await.unwrap();
+    Ok(())
 }
