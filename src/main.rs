@@ -9,23 +9,23 @@ extern crate std;
 #[macro_use]
 extern crate anyhow;
 
+extern crate ctrlc;
+extern crate gstreamer_rtsp_server as gst_rtsp_server;
+extern crate gstreamer_webrtc as gst_webrtc;
 extern crate serde;
 extern crate serde_derive;
-extern crate gstreamer_webrtc as gst_webrtc;
-extern crate gstreamer_rtsp_server as gst_rtsp_server;
-extern crate ctrlc;
 
-mod plugins;
-mod settings;
-mod rtsp;
-mod webrtc;
 mod iot;
 mod media;
+mod plugins;
+mod rtsp;
+mod settings;
+mod webrtc;
 
-use anyhow::{Result, Error};
+use crate::iot::IotModule;
+use crate::media::MediaPipeline;
 use crate::settings::Settings;
-use crate::iot::{IotModule};
-use crate::media::{MediaPipeline};
+use anyhow::{Error, Result};
 use std::process;
 
 fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
@@ -33,7 +33,7 @@ fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
     Ok(())
 }
 
-gst_plugin_define!(
+plugin_define!(
     test,
     env!("CARGO_PKG_DESCRIPTION"),
     plugin_init,
@@ -47,7 +47,6 @@ gst_plugin_define!(
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     //ensure media root is always set.
     if let None = std::env::var_os("media_root") {
@@ -71,7 +70,8 @@ async fn main() -> Result<(), Error> {
     ctrlc::set_handler(move || {
         info!("Terminating on Ctrl+C");
         process::exit(-1);
-    }).expect("Error setting Ctrl-C handler");
+    })
+    .expect("Error setting Ctrl-C handler");
 
     main_loop.run();
     Ok(())

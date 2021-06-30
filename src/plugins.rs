@@ -1,21 +1,11 @@
-// Copyright (C) 2018 Sebastian Dröge <sebastian@centricular.com>
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 use glib::prelude::*;
-use glib::subclass;
 use glib::subclass::prelude::*;
 use gst::prelude::*;
 use gst::subclass::prelude::*;
-use gst;
 use once_cell::sync::Lazy;
 
 // Struct containing all the element data
-struct InferencePlugin {
+pub struct InferencePluginImpl {
     srcpad: gst::Pad,
     sinkpad: gst::Pad,
 }
@@ -28,7 +18,7 @@ static CAT: Lazy<gst::DebugCategory> = Lazy::new(|| {
     )
 });
 
-impl InferencePlugin {
+impl InferencePluginImpl {
     // Called whenever a new buffer is passed to our sink pad. Here buffers should be processed and
     // whenever some output buffer is available have to push it out of the source pad.
     // Here we just pass through all buffers directly
@@ -38,7 +28,7 @@ impl InferencePlugin {
     fn sink_chain(
         &self,
         pad: &gst::Pad,
-        _element: &gst::Element,
+        _element: &InferencePlugin,
         buffer: gst::Buffer,
     ) -> Result<gst::FlowSuccess, gst::FlowError> {
         gst_log!(CAT, obj: pad, "Handling buffer {:?}", buffer);
@@ -52,7 +42,7 @@ impl InferencePlugin {
     //
     // See the documentation of gst::Event and gst::EventRef to see what can be done with
     // events, and especially the gst::EventView type for inspecting events.
-    fn sink_event(&self, pad: &gst::Pad, _element: &gst::Element, event: gst::Event) -> bool {
+    fn sink_event(&self, pad: &gst::Pad, _element: &InferencePlugin, event: gst::Event) -> bool {
         gst_log!(CAT, obj: pad, "Handling event {:?}", event);
         self.srcpad.push_event(event)
     }
@@ -69,7 +59,7 @@ impl InferencePlugin {
     fn sink_query(
         &self,
         pad: &gst::Pad,
-        _element: &gst::Element,
+        _element: &InferencePlugin,
         query: &mut gst::QueryRef,
     ) -> bool {
         gst_log!(CAT, obj: pad, "Handling query {:?}", query);
@@ -84,7 +74,7 @@ impl InferencePlugin {
     //
     // See the documentation of gst::Event and gst::EventRef to see what can be done with
     // events, and especially the gst::EventView type for inspecting events.
-    fn src_event(&self, pad: &gst::Pad, _element: &gst::Element, event: gst::Event) -> bool {
+    fn src_event(&self, pad: &gst::Pad, _element: &InferencePlugin, event: gst::Event) -> bool {
         gst_log!(CAT, obj: pad, "Handling event {:?}", event);
         self.sinkpad.push_event(event)
     }
@@ -101,7 +91,7 @@ impl InferencePlugin {
     fn src_query(
         &self,
         pad: &gst::Pad,
-        _element: &gst::Element,
+        _element: &InferencePlugin,
         query: &mut gst::QueryRef,
     ) -> bool {
         gst_log!(CAT, obj: pad, "Handling query {:?}", query);
@@ -112,18 +102,15 @@ impl InferencePlugin {
 // This trait registers our type with the GObject object system and
 // provides the entry points for creating a new instance and setting
 // up the class data
-impl ObjectSubclass for InferencePlugin {
+#[glib::object_subclass]
+impl ObjectSubclass for InferencePluginImpl {
     const NAME: &'static str = "inferenceplugin";
+    type Type = InferencePlugin;
     type ParentType = gst::Element;
-    type Instance = gst::subclass::ElementInstanceStruct<Self>;
-    type Class = subclass::simple::ClassStruct<Self>;
-
-    // This macro provides some boilerplate.
-    glib_object_subclass!();
 
     // Called when a new instance is to be created. We need to return an instance
     // of our struct here and also get the class struct passed in case it's needed
-    fn with_class(klass: &subclass::simple::ClassStruct<Self>) -> Self {
+    fn with_class(klass: &Self::Class) -> Self {
         // Create our two pads from the templates that were registered with
         // the class and set all the functions on them.
         //
@@ -134,24 +121,24 @@ impl ObjectSubclass for InferencePlugin {
         // - Extract our InferencePlugin struct from the object instance and pass it to us
         //
         // Details about what each function is good for is next to each function definition
-        let templ = klass.get_pad_template("sink").unwrap();
+        let templ = klass.pad_template("sink").unwrap();
         let sinkpad = gst::Pad::builder_with_template(&templ, Some("sink"))
             .chain_function(|pad, parent, buffer| {
-                InferencePlugin::catch_panic_pad_function(
+                InferencePluginImpl::catch_panic_pad_function(
                     parent,
                     || Err(gst::FlowError::Error),
                     |inference, element| inference.sink_chain(pad, element, buffer),
                 )
             })
             .event_function(|pad, parent, event| {
-                InferencePlugin::catch_panic_pad_function(
+                InferencePluginImpl::catch_panic_pad_function(
                     parent,
                     || false,
                     |inference, element| inference.sink_event(pad, element, event),
                 )
             })
             .query_function(|pad, parent, query| {
-                InferencePlugin::catch_panic_pad_function(
+                InferencePluginImpl::catch_panic_pad_function(
                     parent,
                     || false,
                     |inference, element| inference.sink_query(pad, element, query),
@@ -159,17 +146,17 @@ impl ObjectSubclass for InferencePlugin {
             })
             .build();
 
-        let templ = klass.get_pad_template("src").unwrap();
+        let templ = klass.pad_template("src").unwrap();
         let srcpad = gst::Pad::builder_with_template(&templ, Some("src"))
             .event_function(|pad, parent, event| {
-                InferencePlugin::catch_panic_pad_function(
+                InferencePluginImpl::catch_panic_pad_function(
                     parent,
                     || false,
                     |inference, element| inference.src_event(pad, element, event),
                 )
             })
             .query_function(|pad, parent, query| {
-                InferencePlugin::catch_panic_pad_function(
+                InferencePluginImpl::catch_panic_pad_function(
                     parent,
                     || false,
                     |inference, element| inference.src_query(pad, element, query),
@@ -182,80 +169,79 @@ impl ObjectSubclass for InferencePlugin {
         // into the debug logs
         Self { srcpad, sinkpad }
     }
-
-    // Called exactly once when registering the type. Used for
-    // setting up metadata for all instances, e.g. the name and
-    // classification and the pad templates with their caps.
-    //
-    // Actual instances can create pads based on those pad templates
-    // with a subset of the caps given here.
-    fn class_init(klass: &mut subclass::simple::ClassStruct<Self>) {
-        // Set the element specific metadata. This information is what
-        // is visible from gst-inspect-1.0 and can also be programatically
-        // retrieved from the gst::Registry after initial registration
-        // without having to load the plugin in memory.
-        klass.set_metadata(
-            "Inference",
-            "Generic",
-            "Does nothing with the data",
-            "Prakash Duggaraju <duggaraju@gmail.com>",
-        );
-
-        // Create and add pad templates for our sink and source pad. These
-        // are later used for actually creating the pads and beforehand
-        // already provide information to GStreamer about all possible
-        // pads that could exist for this type.
-
-        // Our element can accept any possible caps on both pads
-        let caps = gst::Caps::new_any();
-        let src_pad_template = gst::PadTemplate::new(
-            "src",
-            gst::PadDirection::Src,
-            gst::PadPresence::Always,
-            &caps,
-        )
-        .unwrap();
-        klass.add_pad_template(src_pad_template);
-
-        let sink_pad_template = gst::PadTemplate::new(
-            "sink",
-            gst::PadDirection::Sink,
-            gst::PadPresence::Always,
-            &caps,
-        )
-        .unwrap();
-        klass.add_pad_template(sink_pad_template);
-    }
 }
 
 // Implementation of glib::Object virtual methods
-impl ObjectImpl for InferencePlugin {
-
-    fn get_type_data(&self) -> std::ptr::NonNull<glib::subclass::TypeData> {
-        Self::type_data()
-    }
-    
+impl ObjectImpl for InferencePluginImpl {
     // Called right after construction of a new instance
-    fn constructed(&self, obj: &glib::Object) {
+    fn constructed(&self, obj: &Self::Type) {
         // Call the parent class' ::constructed() implementation first
         self.parent_constructed(obj);
 
         // Here we actually add the pads we created in InferencePlugin::new() to the
         // element so that GStreamer is aware of their existence.
-        let element = obj.downcast_ref::<gst::Element>().unwrap();
-        element.add_pad(&self.sinkpad).unwrap();
-        element.add_pad(&self.srcpad).unwrap();
+        obj.add_pad(&self.sinkpad).unwrap();
+        obj.add_pad(&self.srcpad).unwrap();
     }
 }
 
 // Implementation of gst::Element virtual methods
-impl ElementImpl for InferencePlugin {
+impl ElementImpl for InferencePluginImpl {
+    // Set the element specific metadata. This information is what
+    // is visible from gst-inspect-1.0 and can also be programatically
+    // retrieved from the gst::Registry after initial registration
+    // without having to load the plugin in memory.
+    fn metadata() -> Option<&'static gst::subclass::ElementMetadata> {
+        static ELEMENT_METADATA: Lazy<gst::subclass::ElementMetadata> = Lazy::new(|| {
+            gst::subclass::ElementMetadata::new(
+                "Inference",
+                "Generic",
+                "Does nothing with the data",
+                "Prakash Duggaraju <duggaraju@gmail.com>",
+            )
+        });
+
+        Some(&*ELEMENT_METADATA)
+    }
+
+    // Create and add pad templates for our sink and source pad. These
+    // are later used for actually creating the pads and beforehand
+    // already provide information to GStreamer about all possible
+    // pads that could exist for this type.
+    //
+    // Actual instances can create pads based on those pad templates
+    fn pad_templates() -> &'static [gst::PadTemplate] {
+        static PAD_TEMPLATES: Lazy<Vec<gst::PadTemplate>> = Lazy::new(|| {
+            // Our element can accept any possible caps on both pads
+            let caps = gst::Caps::new_any();
+            let src_pad_template = gst::PadTemplate::new(
+                "src",
+                gst::PadDirection::Src,
+                gst::PadPresence::Always,
+                &caps,
+            )
+            .unwrap();
+
+            let sink_pad_template = gst::PadTemplate::new(
+                "sink",
+                gst::PadDirection::Sink,
+                gst::PadPresence::Always,
+                &caps,
+            )
+            .unwrap();
+
+            vec![src_pad_template, sink_pad_template]
+        });
+
+        PAD_TEMPLATES.as_ref()
+    }
+
     // Called whenever the state of the element should be changed. This allows for
     // starting up the element, allocating/deallocating resources or shutting down
     // the element again.
     fn change_state(
         &self,
-        element: &gst::Element,
+        element: &Self::Type,
         transition: gst::StateChange,
     ) -> Result<gst::StateChangeSuccess, gst::StateChangeError> {
         gst_trace!(CAT, obj: element, "Changing state {:?}", transition);
@@ -265,6 +251,13 @@ impl ElementImpl for InferencePlugin {
     }
 }
 
+glib::wrapper! {
+    pub struct InferencePlugin(ObjectSubclass<InferencePluginImpl>) @extends gst::Element, gst::Object;
+}
+
+unsafe impl Send for InferencePlugin {}
+unsafe impl Sync for InferencePlugin {}
+
 // Registers the type for our element, and then registers in GStreamer under
 // the name "rsInferencePlugin" for being able to instantiate it via e.g.
 // gst::ElementFactory::make().
@@ -273,6 +266,6 @@ pub fn register(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
         Some(plugin),
         "inference",
         gst::Rank::None,
-        InferencePlugin::get_type(),
+        InferencePlugin::static_type(),
     )
 }
