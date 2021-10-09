@@ -29,7 +29,6 @@ ctrlc = "3.1.9"
 
 glib = { git = "https://github.com/gtk-rs/gtk-rs-core" }
 gst = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs", features = ["v1_16"], package="gstreamer" }
-gstreamer-app = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs", features = ["v1_16"], package="gstreamer-app" }
 gstreamer-sdp = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs", features = ["v1_16"], package="gstreamer-sdp" }
 gstreamer-rtsp = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs", features = ["v1_16"], package="gstreamer-rtsp" }
 gstreamer-rtsp-server = { git = "https://gitlab.freedesktop.org/gstreamer/gstreamer-rs", features = ["v1_16"], package="gstreamer-rtsp-server" }

@@ -9,6 +9,7 @@ extern crate std;
 use std::path::Path;
 
 use anyhow::{Error, Result};
+use glib::Value;
 use glib::subclass::prelude::*;
 use gst::{ClockTime, Message, MessageView, SeekFlags, SeekType, ELEMENT_METADATA_KLASS};
 use gstreamer_rtsp_server::prelude::*;
@@ -44,6 +45,8 @@ impl BinImpl for ReplayBinImpl {
         info!("Received message by bin: {:?}", view);
         if let MessageView::SegmentDone(d) = view {
             warn!("Bin Segment Done bye!!");
+        } else if let MessageView::StreamCollection(streams) = view {
+            info!("Received stream collection {:?}", streams);
         }
         self.parent_handle_message(bin, message)
     }
@@ -191,6 +194,7 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         src.set_property("location", file.to_str()).unwrap();
 
         let parser = gst::ElementFactory::make("parsebin", Some("pb")).unwrap();
+        parser.set_property("expose-all-streams", &false).unwrap();
 
         let pay = gst::ElementFactory::make("rtph264pay", Some("pay0")).unwrap();
         let pt: u32 = 96;
@@ -207,9 +211,17 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
                 demux.name(),
                 caps
             );
-            let sink_pad = &_pay.sink_pads()[0];
-            src_pad.link(sink_pad).unwrap();
+            if name.starts_with("video/") {
+                let sink_pad = &_pay.sink_pads()[0];
+                src_pad.link(sink_pad).unwrap();    
+            }
         });
+
+        parser.connect("autoplug-query", false, | args | -> Option<Value> {
+            info!("Auto plug query called!! {:?} {:?} {:?}", args[0], args[1], args[2]);
+
+            Some(false.to_value())
+        }).unwrap();
 
         bin.add_many(&[&src, &parser, &pay]).unwrap();
         gst::Element::link_many(&[&src, &parser]).unwrap();

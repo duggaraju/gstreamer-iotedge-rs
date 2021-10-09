@@ -73,7 +73,7 @@ impl MediaPipeline {
             .set_state(gst::State::Playing)
             .expect("Unable to set the pipeline to the `Playing` state");
         self.pipeline = pipeline.ok();
-
+        info!("started media pipeline...");
         self.process();
     }
 
