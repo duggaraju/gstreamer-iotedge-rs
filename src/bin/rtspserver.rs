@@ -21,6 +21,12 @@ pub struct ReplayBinImpl {
     path: String,
 }
 
+impl ReplayBinImpl {
+    fn media_root() -> String {
+        std::env::var("media_root").unwrap_or(String::from("/media/test.mp4"))
+    }
+}
+
 #[glib::object_subclass]
 impl ObjectSubclass for ReplayBinImpl {
     const NAME: &'static str = "ReplayBin";
@@ -30,7 +36,7 @@ impl ObjectSubclass for ReplayBinImpl {
     fn new() -> Self {
         Self {
             pt: 96,
-            path: String::from("/mnt/d/media/bing.mp4"),
+            path: Self::media_root(),
         }
     }
 }
@@ -178,8 +184,8 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         url: &gstreamer_rtsp::RTSPUrl,
     ) -> Option<gst::Element> {
         let uri = url.request_uri().unwrap();
-        info!("Creating media for URL {}", uri);
         let components = url.decode_path_components();
+        info!("Creating media for Base path: {} , URL {}, components: {:?}", self.path, uri, components);
         let file = Path::new(&self.path).join(components[2].as_str());
         info!("Mapped URL {} to path {:?}", uri, file);
 
@@ -238,10 +244,10 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         if pipeline.is_some() {
             let _pipeline = pipeline.as_ref().unwrap().clone();
             let bus = _pipeline.bus().unwrap();
-            // bus.add_watch(move |_, mesg| {
-            //     info!("Received message {:?}", mesg);
-            //     glib::Continue(true)
-            // }).unwrap();
+            bus.add_watch(move |_, mesg| {
+                info!("Received message {:?}", mesg);
+                glib::Continue(true)
+            }).unwrap();
         }
         pipeline
     }
@@ -283,16 +289,16 @@ impl ObjectImpl for MountPointsImpl {}
 impl RTSPMountPointsImpl for MountPointsImpl {
     fn make_path(
         &self,
-        mount_points: &Self::Type,
+        _mount_points: &Self::Type,
         url: &gstreamer_rtsp::RTSPUrl,
     ) -> Option<glib::GString> {
         let path = url.decode_path_components();
         let uri = url.request_uri().unwrap();
-        println!("Make path called for {} {} {}", uri, path[0], path[1]);
-        if path[1].as_str() == "media" {
+        info!("Make path called for {} {} {:?}", uri, path.len(), path);
+        if path[1].as_str() == "media" && path.len() >= 2 {
             Some(glib::GString::from("/media"))
         } else {
-            self.parent_make_path(mount_points, url)
+            None
         }
     }
 }
@@ -319,6 +325,7 @@ fn main() -> Result<(), Error> {
 
     let server = gstreamer_rtsp_server::RTSPServer::new();
     let mounts = MountPoints::default();
+    server.set_service("8555");
     server.set_mount_points(Some(&mounts));
 
     let factory = Factory::default();
@@ -328,7 +335,7 @@ fn main() -> Result<(), Error> {
     let id = server.attach(None)?;
 
     info!(
-        "Started RTSP server on rtsp://0.0.0.0:{}",
+        "Started RTSP server. Make a request for rtsp://0.0.0.0:{}/media/filename.mp4",
         server.bound_port()
     );
     main_loop.run();

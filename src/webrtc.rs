@@ -19,6 +19,8 @@ use anyhow::Error;
 use warp::ws::Message;
 use warp::Filter;
 
+use crate::media::AppSinks;
+
 #[derive(Clone)]
 pub struct WebRtcContext {
     sender: SyncSender<Message>,
@@ -357,7 +359,7 @@ impl WebServer {
         send.await.unwrap();
     }
 
-    pub async fn start(webrtc_pipeline: String) {
+    pub async fn start(webrtc_pipeline: String, appsinks: AppSinks) {
         info!("Initializing HTTP server...");
         let root_dir = Path::new("wwwroot");
         let root = warp::path("wwwroot").and(warp::fs::dir(root_dir));

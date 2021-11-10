@@ -49,23 +49,23 @@ example:
 ```json
 "properties": {
     "desired": {
-      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@$IP/media name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! appsink name=video max-buffers=30 drop=true src. ! rtpmp4gdepay ! aacparse ! appsink name=audio drop=true max-buffers=30",
+      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@$IP/media name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! proxysink name=video src. ! rtpmp4gdepay ! aacparse ! proxysink name=audio",
       "rtsp_pipeline": "( rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location='rtsp://$USER:$PASSWORD@$IP/axis-media/media.amp' latency=200 name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! rtph264pay name=pay0 pt=96 src. ! rtpmp4gdepay ! aacparse ! rtpmp4apay name=pay1 pt=97 )",
       "$metadata": {}
 ```
 
 ## If you want to share some some of the processing between the main pipeline and the RTSP pipeline...
 
-* Identify the streams in your pipeline that you want to stream and send them to an appsink with name audio/video. Use tee element if needed.
-* Add an rtsp_pipeline with appsrc name audiosrc/videosrc. The app will then pipe the buffers from the sink to the source and use that for playback.
+* Identify the streams in your pipeline that you want to stream and send them to an proxysink with name audio/video. Use tee element if needed.
+* Add an rtsp_pipeline with proxysrc name audiosrc/videosrc. The app will then pipe the buffers from the sink to the source and use that for playback.
 * The RTSP server is by default running on port 8554. So run something like ffplay rtsp://ipaddres:8554/player to play the stream.
 
 example:
 ```json
 "properties": {
     "desired": {
-      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@IP.ADDRESS/media name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! appsink name=video max-buffers=30 drop=true src. ! rtpmp4gdepay ! aacparse ! appsink name=audio drop=true max-buffers=30",
-      "rtsp_pipeline": "( appsrc name=videosrc ! h264parse ! rtph264pay config-interval=-1 name=pay0 pt=96 )",
+      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@IP.ADDRESS/media name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! proxysink  src. ! rtpmp4gdepay ! aacparse ! proxysink name=audio drop=true max-buffers=30",
+      "rtsp_pipeline": "( proxysrc name=videosrc ! h264parse ! rtph264pay config-interval=-1 name=pay0 pt=96 )",
       "$metadata": {}
 ```
 
@@ -77,8 +77,8 @@ example:
 ```json
 "properties": {
     "desired": {
-      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@IP.ADDRESS/media name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! appsink name=video max-buffers=30 drop=true src. ! rtpmp4gdepay ! aacparse ! appsink name=audio drop=true max-buffers=30",
-      "webrtc_pipeline": "webrtcbin name=webrtcbin stun-server=stun://stun.l.google.com:19302 rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWROD@10.91.98.185/axis-media/media.amp ! rtph264depay ! h264parse ! rtph264pay config-interval=-1 name=payloader ! application/x-rtp,media=video,encoding-name=H264,payload=96 ! webrtcbin.",
+      "pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWORD@IP.ADDRESS/media name=src src. ! queue ! rtph264depay ! h264parse config-interval=-1 ! proxysink src. ! rtpmp4gdepay ! aacparse ! proxysink name=audio",
+      "webrtc_pipeline": "rtspsrc protocols=GST_RTSP_LOWER_TRANS_TCP location=rtsp://$USER:$PASSWROD@10.91.98.185/axis-media/media.amp ! rtph264depay ! h264parse ! rtph264pay config-interval=-1 name=payloader ! application/x-rtp,media=video,encoding-name=H264,payload=96 ! webrtcbin. webrtcbin name=webrtcbin stun-server=stun://stun.l.google.com:19302",
       "$metadata": {}
     }
 ```

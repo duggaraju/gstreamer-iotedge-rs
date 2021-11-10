@@ -1,6 +1,7 @@
 extern crate gstreamer_rtsp_server as gst_rtsp_server;
 
 use crate::media::AppSinks;
+use gst::{Clock, ClockTime};
 use gst::prelude::*;
 use gst::{Bin, Element};
 use gst_rtsp_server::prelude::*;
@@ -11,6 +12,7 @@ pub struct RtspContext {
     pub videosrc: Option<Element>,
     pub audiosink: Option<Element>,
     pub videosink: Option<Element>,
+    pub clock:Option<Clock>,
 }
 
 impl RtspContext {
@@ -20,11 +22,13 @@ impl RtspContext {
             videosink: sinks.videosink,
             audiosrc: None,
             videosrc: None,
+            clock: None,
         }
     }
 
     fn connect_sink_source(&self, sink: &Element, source: &Element) {
         source.set_property("proxysink", sink).unwrap();
+        source.set_base_time(sink.base_time().unwrap());
     }
 
     fn on_media_configure(
@@ -34,8 +38,9 @@ impl RtspContext {
     ) {
         let mut context = self.clone();
         let element = media.element().unwrap();
+        media.set_clock(self.clock.as_ref());
+        
         let bin = element.downcast::<Bin>().unwrap();
-
         context.videosrc = bin.by_name_recurse_up("videosrc");
         context.audiosrc = bin.by_name_recurse_up("audiosrc");
 
@@ -68,7 +73,7 @@ impl RtspContext {
             context.on_media_configure(factory, media);
         });
         factory.connect_media_constructed(|_, _| {
-            info!("constructed media !!");
+            info!("successfully constructed RTSP media !!");
         });
         // Now we add a new mount-point and tell the RTSP server to serve the content
         // provided by the factory we configured above, when a client connects to

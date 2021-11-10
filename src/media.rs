@@ -2,7 +2,7 @@ use crate::rtsp::RtspContext;
 use crate::webrtc::WebServer;
 use crate::Settings;
 use gst::prelude::*;
-use gst::{Bin, Element};
+use gst::{Bin, Element, Clock};
 
 use tokio::task;
 
@@ -16,6 +16,7 @@ pub struct MediaPipeline {
 pub struct AppSinks {
     pub audiosink: Option<Element>,
     pub videosink: Option<Element>,
+    pub clock: Option<Clock>
 }
 
 impl MediaPipeline {
@@ -32,11 +33,13 @@ impl MediaPipeline {
             return AppSinks {
                 videosink: bin.by_name_recurse_up("video"),
                 audiosink: bin.by_name_recurse_up("audio"),
+                clock: pipeline.clock()
             };
         }
         AppSinks {
             videosink: None,
             audiosink: None,
+            clock: None
         }
     }
 
@@ -125,8 +128,9 @@ impl MediaPipeline {
             .map_or(String::new(), String::from);
         self.settings = Some(settings);
         if http {
+            let appsinks = self.get_appsinks();
             task::spawn(async move {
-                let _server = WebServer::start(pipeline).await;
+                let _server = WebServer::start(pipeline, appsinks).await;
             });
         }
     }
