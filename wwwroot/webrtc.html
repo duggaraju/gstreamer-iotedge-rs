@@ -92,9 +92,24 @@
         websocketConnection.addEventListener("message", onServerMessage);
       }
 
+      function setClock()
+      {
+        const now = new Date();
+        const format = now.toLocaleTimeString('en-US', {
+          hour:"2-digit",
+          minute:"2-digit",
+          second:"2-digit",
+          hour12: false,
+          fractionalSecondDigits:2
+          
+        })
+        document.getElementById('clock').innerText = format;
+      }
+
       window.onload = function() {
         var vidstream = document.getElementById("stream");
         var config = { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] };
+        setInterval(setClock, 100);
         playStream(vidstream, null, null, null, config, function (errmsg) { console.error(errmsg); });
       };
 
@@ -102,6 +117,7 @@
   </head>
 
   <body>
+    <h2 id="clock"></h2>
     <div>
       <video id="stream" autoplay muted controls playsinline>Your browser does not support video</video>
     </div>
