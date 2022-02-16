@@ -185,6 +185,8 @@ impl ObjectImpl for InferencePluginImpl {
     }
 }
 
+impl GstObjectImpl for InferencePluginImpl {}
+
 // Implementation of gst::Element virtual methods
 impl ElementImpl for InferencePluginImpl {
     // Set the element specific metadata. This information is what

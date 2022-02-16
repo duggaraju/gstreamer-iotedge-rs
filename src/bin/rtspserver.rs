@@ -42,6 +42,7 @@ impl ObjectSubclass for ReplayBinImpl {
 }
 
 impl ElementImpl for ReplayBinImpl {}
+impl GstObjectImpl for ReplayBinImpl {}
 
 impl ObjectImpl for ReplayBinImpl {}
 
@@ -150,7 +151,7 @@ impl ObjectSubclass for FactoryImpl {
     type ParentType = gstreamer_rtsp_server::RTSPMediaFactory;
 
     fn with_class(_klass: &Self::Class) -> Self {
-        let payloaders = gst::Registry::get().feature_filter(
+        let payloaders = gst::Registry::get().features_filtered(
             |feature| {
                 let factory = feature.downcast_ref::<gst::ElementFactory>();
                 if let Some(factory) = factory {
@@ -161,10 +162,10 @@ impl ObjectSubclass for FactoryImpl {
             },
             false,
         );
-        info!("Found {} payloders", payloaders.len());
+        info!("Found {} payloders", 0);
         let media_root = std::env::var("media_root").unwrap_or(String::from("/media/"));
 
-        Self { payloaders, path: media_root }
+        Self { payloaders: Vec::new(), path: media_root }
     }
 }
 
@@ -197,14 +198,14 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         let bin = ReplayBin::default();
 
         let src = gst::ElementFactory::make("filesrc", None).unwrap();
-        src.set_property("location", file.to_str()).unwrap();
+        src.set_property("location", file.to_str());
 
         let parser = gst::ElementFactory::make("parsebin", Some("pb")).unwrap();
-        parser.set_property("expose-all-streams", &false).unwrap();
+        parser.set_property("expose-all-streams", &false);
 
         let pay = gst::ElementFactory::make("rtph264pay", Some("pay0")).unwrap();
         let pt: u32 = 96;
-        pay.set_property("pt", &pt).unwrap();
+        pay.set_property("pt", &pt);
 
         let _bin = bin.clone();
         let _pay = pay.clone();
@@ -227,7 +228,7 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
             info!("Auto plug query called!! {:?} {:?} {:?}", args[0], args[1], args[2]);
 
             Some(false.to_value())
-        }).unwrap();
+        });
 
         bin.add_many(&[&src, &parser, &pay]).unwrap();
         gst::Element::link_many(&[&src, &parser]).unwrap();
@@ -339,6 +340,6 @@ fn main() -> Result<(), Error> {
         server.bound_port()
     );
     main_loop.run();
-    glib::source_remove(id);
+    id.remove();
     Ok(())
 }

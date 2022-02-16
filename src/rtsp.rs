@@ -27,7 +27,7 @@ impl RtspContext {
     }
 
     fn connect_sink_source(&self, sink: &Element, source: &Element) {
-        source.set_property("proxysink", sink).unwrap();
+        source.set_property("proxysink", sink);
         source.set_base_time(sink.base_time().unwrap());
     }
 

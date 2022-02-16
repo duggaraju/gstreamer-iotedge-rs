@@ -88,8 +88,7 @@ impl WebRtcContext {
                 }
 
                 None
-            })
-            .unwrap();
+            });
 
         let client3 = client.clone();
         webrtcbin
@@ -105,8 +104,7 @@ impl WebRtcContext {
                     );
                 }
                 None
-            })
-            .unwrap();
+            });
 
         element
             .set_state(gst::State::Playing)
@@ -133,8 +131,7 @@ impl WebRtcContext {
             .get::<gst_webrtc::WebRTCSessionDescription>()
             .expect("Invalid argument");
         self.webrtcbin
-            .emit_by_name("set-local-description", &[&offer, &None::<gst::Promise>])
-            .unwrap();
+            .emit_by_name::<()>("set-local-description", &[&offer, &None::<gst::Promise>]);
 
         info!(
             "sending SDP offer to peer: {}",
@@ -166,8 +163,7 @@ impl WebRtcContext {
         });
 
         self.webrtcbin
-            .emit_by_name("create-offer", &[&None::<gst::Structure>, &promise])
-            .unwrap();
+            .emit_by_name::<()>("create-offer", &[&None::<gst::Structure>, &promise]);
 
         Ok(())
     }
@@ -211,7 +207,7 @@ impl WebRtcContext {
 
     fn handle_ice(&self, sdp_mline_index: u32, candidate: &str) -> Result<(), anyhow::Error> {
         self.webrtcbin
-            .emit_by_name("add-ice-candidate", &[&sdp_mline_index, &candidate])?;
+            .emit_by_name::<()>("add-ice-candidate", &[&sdp_mline_index, &candidate]);
         Ok(())
     }
 
@@ -233,7 +229,7 @@ impl WebRtcContext {
             .get::<gst_webrtc::WebRTCSessionDescription>()
             .expect("Invalid argument");
         self.webrtcbin
-            .emit_by_name("set-local-description", &[&answer, &None::<gst::Promise>])
+            .try_emit_by_name::<()>("set-local-description", &[&answer, &None::<gst::Promise>])
             .unwrap();
 
         info!(
@@ -261,8 +257,7 @@ impl WebRtcContext {
                 gst_webrtc::WebRTCSessionDescription::new(gst_webrtc::WebRTCSDPType::Answer, ret);
 
             self.webrtcbin
-                .emit_by_name("set-remote-description", &[&answer, &None::<gst::Promise>])
-                .unwrap();
+                .emit_by_name::<()>("set-remote-description", &[&answer, &None::<gst::Promise>]);
 
             Ok(())
         } else if type_ == "offer" {
@@ -282,8 +277,7 @@ impl WebRtcContext {
 
                 clone
                     .webrtcbin
-                    .emit_by_name("set-remote-description", &[&offer, &None::<gst::Promise>])
-                    .unwrap();
+                    .emit_by_name::<()>("set-remote-description", &[&offer, &None::<gst::Promise>]);
 
                 let app_clone = clone.clone();
                 let promise = gst::Promise::with_change_func(move |reply| {
@@ -298,8 +292,7 @@ impl WebRtcContext {
 
                 clone
                     .webrtcbin
-                    .emit_by_name("create-answer", &[&None::<gst::Structure>, &promise])
-                    .unwrap();
+                    .emit_by_name::<()>("create-answer", &[&None::<gst::Structure>, &promise]);
             });
 
             Ok(())
