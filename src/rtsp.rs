@@ -1,10 +1,15 @@
-extern crate gstreamer_rtsp_server as gst_rtsp_server;
-
 use crate::media::AppSinks;
-use gst::{Clock, ClockTime};
-use gst::prelude::*;
-use gst::{Bin, Element};
-use gst_rtsp_server::prelude::*;
+use gstreamer::{
+    prelude::{Cast, ObjectExt},
+    traits::{ElementExt, GstBinExt},
+    Bin, Clock, Element,
+};
+use gstreamer_rtsp_server::{
+    prelude::RTSPServerExtManual,
+    traits::{RTSPMediaExt, RTSPMediaFactoryExt, RTSPMountPointsExt, RTSPServerExt},
+    RTSPMedia, RTSPMediaFactory, RTSPServer,
+};
+use log::info;
 
 #[derive(Clone, Debug)]
 pub struct RtspContext {
@@ -12,7 +17,7 @@ pub struct RtspContext {
     pub videosrc: Option<Element>,
     pub audiosink: Option<Element>,
     pub videosink: Option<Element>,
-    pub clock:Option<Clock>,
+    pub clock: Option<Clock>,
 }
 
 impl RtspContext {
@@ -31,30 +36,24 @@ impl RtspContext {
         source.set_base_time(sink.base_time().unwrap());
     }
 
-    fn on_media_configure(
-        &self,
-        _: &gst_rtsp_server::RTSPMediaFactory,
-        media: &gst_rtsp_server::RTSPMedia,
-    ) {
+    fn on_media_configure(&self, _: &RTSPMediaFactory, media: &RTSPMedia) {
         let mut context = self.clone();
-        let element = media.element().unwrap();
+        let element = media.element();
         media.set_clock(self.clock.as_ref());
-        
+
         let bin = element.downcast::<Bin>().unwrap();
         context.videosrc = bin.by_name_recurse_up("videosrc");
         context.audiosrc = bin.by_name_recurse_up("audiosrc");
 
         if let Some(ref videosrc) = context.videosrc {
             if let Some(ref videosink) = context.videosink {
-                context
-                    .connect_sink_source(videosink, &videosrc);
+                context.connect_sink_source(videosink, &videosrc);
             }
         }
 
         if let Some(ref audiosrc) = context.audiosrc {
             if let Some(ref audiosink) = context.audiosink {
-                context
-                    .connect_sink_source(audiosink, &audiosrc);
+                context.connect_sink_source(audiosink, &audiosrc);
             }
         }
     }
@@ -63,9 +62,9 @@ impl RtspContext {
         let rtsp_pipeline = shellexpand::env(pipeline).unwrap();
         info!("expanded RTSP pipeline: {}", rtsp_pipeline);
 
-        let server = gst_rtsp_server::RTSPServer::new();
+        let server = RTSPServer::default();
         let mounts = server.mount_points().unwrap();
-        let factory = gst_rtsp_server::RTSPMediaFactory::new();
+        let factory = RTSPMediaFactory::default();
         factory.set_launch(&rtsp_pipeline);
         factory.set_shared(true);
         let context = self.clone();
@@ -78,7 +77,7 @@ impl RtspContext {
         // Now we add a new mount-point and tell the RTSP server to serve the content
         // provided by the factory we configured above, when a client connects to
         // this specific path.
-        mounts.add_factory("/player", &factory);
+        mounts.add_factory("/player", factory);
 
         let _id = server.attach(None);
 

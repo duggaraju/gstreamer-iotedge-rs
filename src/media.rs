@@ -1,9 +1,11 @@
 use crate::rtsp::RtspContext;
 use crate::webrtc::WebServer;
 use crate::Settings;
-use gst::prelude::*;
-use gst::{Bin, Element, Clock};
-
+use gstreamer::{
+    parse_launch_full, prelude::*, Bin, Clock, Element, MessageView, ParseContext, ParseError,
+    ParseFlags, State,
+};
+use log::{error, info};
 use tokio::task;
 
 #[derive(Clone)]
@@ -16,7 +18,7 @@ pub struct MediaPipeline {
 pub struct AppSinks {
     pub audiosink: Option<Element>,
     pub videosink: Option<Element>,
-    pub clock: Option<Clock>
+    pub clock: Option<Clock>,
 }
 
 impl MediaPipeline {
@@ -33,20 +35,20 @@ impl MediaPipeline {
             return AppSinks {
                 videosink: bin.by_name_recurse_up("video"),
                 audiosink: bin.by_name_recurse_up("audio"),
-                clock: pipeline.clock()
+                clock: pipeline.clock(),
             };
         }
         AppSinks {
             videosink: None,
             audiosink: None,
-            clock: None
+            clock: None,
         }
     }
 
     pub fn close(&mut self) {
         if let Some(ref pipeline) = self.pipeline {
             pipeline
-                .set_state(gst::State::Null)
+                .set_state(State::Null)
                 .expect("failed to set pipeline to null");
             self.pipeline = None;
         }
@@ -55,14 +57,11 @@ impl MediaPipeline {
     fn start(&mut self, pipeline: &str) {
         info!("expanding environemnt variables in pipeline: {}", pipeline);
         let expanded_pipeline = shellexpand::env(pipeline).unwrap();
-        let mut context = gst::ParseContext::new();
-        let pipeline = gst::parse_launch_full(
-            &expanded_pipeline,
-            Some(&mut context),
-            gst::ParseFlags::empty(),
-        );
+        let mut context = ParseContext::new();
+        let pipeline =
+            parse_launch_full(&expanded_pipeline, Some(&mut context), ParseFlags::empty());
         if let Err(err) = pipeline {
-            if let Some(gst::ParseError::NoSuchElement) = err.kind::<gst::ParseError>() {
+            if let Some(ParseError::NoSuchElement) = err.kind::<ParseError>() {
                 error!("Missing element(s): {:?}", context.missing_elements());
             } else {
                 error!("Failed to parse pipeline: {}", err);
@@ -73,7 +72,7 @@ impl MediaPipeline {
         pipeline
             .as_ref()
             .unwrap()
-            .set_state(gst::State::Playing)
+            .set_state(State::Playing)
             .expect("Unable to set the pipeline to the `Playing` state");
         self.pipeline = pipeline.ok();
         info!("started media pipeline...");
@@ -86,12 +85,11 @@ impl MediaPipeline {
             .bus()
             .expect("Failed to get the bus from pipeline!");
         bus.add_watch(move |_, msg| {
-            use gst::MessageView;
             let cont = match msg.view() {
                 MessageView::Eos(..) => {
                     error!("Received EOS on the pipeline!");
                     pipeline
-                        .set_state(gst::State::Null)
+                        .set_state(State::Null)
                         .expect("Unable to set the pipeline to the `Null` state");
                     false
                 }
@@ -106,7 +104,7 @@ impl MediaPipeline {
                 }
                 _ => true,
             };
-            glib::Continue(cont)
+            gstreamer::glib::Continue(cont)
         })
         .expect("Failed to add watch!");
     }

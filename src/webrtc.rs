@@ -1,13 +1,14 @@
-extern crate gstreamer_webrtc as gst_webrtc;
 extern crate serde;
 extern crate serde_derive;
 
-use gst::element_error;
-use gst::prelude::*;
-use gst::{Bin, Element};
-use std::path::Path;
-
+use gstreamer::glib::Object;
+use gstreamer::{
+    element_error, parse_launch_full, prelude::*, promise, Bin, Element, LibraryError,
+    ParseContext, ParseError, ParseFlags, Promise, PromiseError, State, Structure, StructureRef,
+};
+use log::{error, info};
 use serde_derive::{Deserialize, Serialize};
+use std::path::Path;
 use std::result::Result;
 use std::str;
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -47,14 +48,11 @@ impl WebRtcContext {
     pub fn start(pipeline: String, sender: SyncSender<Message>) -> anyhow::Result<WebRtcContext> {
         let expanded_pipeline = shellexpand::env(&pipeline).unwrap();
         info!("expanded Web RTC  pipeline: {}", expanded_pipeline);
-        let mut context = gst::ParseContext::new();
-        let element = gst::parse_launch_full(
-            &expanded_pipeline,
-            Some(&mut context),
-            gst::ParseFlags::empty(),
-        );
+        let mut context = ParseContext::new();
+        let element =
+            parse_launch_full(&expanded_pipeline, Some(&mut context), ParseFlags::empty());
         if let Err(err) = element {
-            if let Some(gst::ParseError::NoSuchElement) = err.kind::<gst::ParseError>() {
+            if let Some(ParseError::NoSuchElement) = err.kind::<ParseError>() {
                 error!("Missing element(s): {:?}", context.missing_elements());
             } else {
                 error!("Failed to parse pipeline: {}", err);
@@ -76,38 +74,36 @@ impl WebRtcContext {
         };
 
         let client2 = client.clone();
-        webrtcbin
-            .connect("on-negotiation-needed", false, move |values| {
-                let _webrtc = values[0].get::<gst::Element>().unwrap();
-                if let Err(err) = client2.on_negotiation_needed() {
-                    element_error!(
-                        _webrtc,
-                        gst::LibraryError::Failed,
-                        ("Failed to negotiate: {:?}", err)
-                    );
-                }
+        webrtcbin.connect("on-negotiation-needed", false, move |values| {
+            let _webrtc = values[0].get::<Element>().unwrap();
+            if let Err(err) = client2.on_negotiation_needed() {
+                element_error!(
+                    _webrtc,
+                    LibraryError::Failed,
+                    ("Failed to negotiate: {:?}", err)
+                );
+            }
 
-                None
-            });
+            None
+        });
 
         let client3 = client.clone();
-        webrtcbin
-            .connect("on-ice-candidate", false, move |values| {
-                let _webrtc = values[0].get::<gst::Element>().expect("Invalid argument");
-                let mlineindex = values[1].get::<u32>().expect("Invalid argument");
-                let candidate = values[2].get::<String>().expect("Invalid argument");
-                if let Err(err) = client3.on_ice_candidate(mlineindex, candidate) {
-                    element_error!(
-                        _webrtc,
-                        gst::LibraryError::Failed,
-                        ("Failed to send ICE candidate: {:?}", err)
-                    );
-                }
-                None
-            });
+        webrtcbin.connect("on-ice-candidate", false, move |values| {
+            let _webrtc = values[0].get::<Element>().expect("Invalid argument");
+            let mlineindex = values[1].get::<u32>().expect("Invalid argument");
+            let candidate = values[2].get::<String>().expect("Invalid argument");
+            if let Err(err) = client3.on_ice_candidate(mlineindex, candidate) {
+                element_error!(
+                    _webrtc,
+                    LibraryError::Failed,
+                    ("Failed to send ICE candidate: {:?}", err)
+                );
+            }
+            None
+        });
 
         element
-            .set_state(gst::State::Playing)
+            .set_state(State::Playing)
             .expect("Unable to set the pipeline to the `Playing` state");
 
         Ok(client)
@@ -115,7 +111,7 @@ impl WebRtcContext {
 
     fn on_offer_created(
         &self,
-        reply: Result<Option<&gst::StructureRef>, gst::PromiseError>,
+        reply: Result<Option<&StructureRef>, PromiseError>,
     ) -> anyhow::Result<()> {
         let reply = match reply {
             Ok(reply) => reply,
@@ -131,7 +127,7 @@ impl WebRtcContext {
             .get::<gst_webrtc::WebRTCSessionDescription>()
             .expect("Invalid argument");
         self.webrtcbin
-            .emit_by_name::<()>("set-local-description", &[&offer, &None::<gst::Promise>]);
+            .emit_by_name::<()>("set-local-description", &[&offer, &None::<Promise>]);
 
         info!(
             "sending SDP offer to peer: {}",
@@ -152,18 +148,18 @@ impl WebRtcContext {
         info!("Creating negotiation offer");
 
         let client = self.clone();
-        let promise = gst::promise::Promise::with_change_func(move |reply| {
+        let promise = promise::Promise::with_change_func(move |reply| {
             if let Err(err) = client.on_offer_created(reply) {
                 element_error!(
                     client.webrtcbin,
-                    gst::LibraryError::Failed,
+                    LibraryError::Failed,
                     ("Failed to send SDP offer: {:?}", err)
                 );
             }
         });
 
         self.webrtcbin
-            .emit_by_name::<()>("create-offer", &[&None::<gst::Structure>, &promise]);
+            .emit_by_name::<()>("create-offer", &[&None::<Structure>, &promise]);
 
         Ok(())
     }
@@ -213,7 +209,7 @@ impl WebRtcContext {
 
     fn on_answer_created(
         &self,
-        reply: Result<Option<&gst::StructureRef>, gst::PromiseError>,
+        reply: Result<Option<&StructureRef>, PromiseError>,
     ) -> Result<(), anyhow::Error> {
         let reply = match reply {
             Ok(reply) => reply,
@@ -229,7 +225,7 @@ impl WebRtcContext {
             .get::<gst_webrtc::WebRTCSessionDescription>()
             .expect("Invalid argument");
         self.webrtcbin
-            .try_emit_by_name::<()>("set-local-description", &[&answer, &None::<gst::Promise>])
+            .emit_by_name::<Option<Object>>("set-local-description", &[&answer, &None::<Promise>])
             .unwrap();
 
         info!(
@@ -257,7 +253,7 @@ impl WebRtcContext {
                 gst_webrtc::WebRTCSessionDescription::new(gst_webrtc::WebRTCSDPType::Answer, ret);
 
             self.webrtcbin
-                .emit_by_name::<()>("set-remote-description", &[&answer, &None::<gst::Promise>]);
+                .emit_by_name::<()>("set-remote-description", &[&answer, &None::<Promise>]);
 
             Ok(())
         } else if type_ == "offer" {
@@ -277,14 +273,14 @@ impl WebRtcContext {
 
                 clone
                     .webrtcbin
-                    .emit_by_name::<()>("set-remote-description", &[&offer, &None::<gst::Promise>]);
+                    .emit_by_name::<()>("set-remote-description", &[&offer, &None::<Promise>]);
 
                 let app_clone = clone.clone();
-                let promise = gst::Promise::with_change_func(move |reply| {
+                let promise = Promise::with_change_func(move |reply| {
                     if let Err(err) = app_clone.on_answer_created(reply) {
                         element_error!(
                             app_clone.webrtcbin,
-                            gst::LibraryError::Failed,
+                            LibraryError::Failed,
                             ("Failed to send SDP answer: {:?}", err)
                         );
                     }
@@ -292,7 +288,7 @@ impl WebRtcContext {
 
                 clone
                     .webrtcbin
-                    .emit_by_name::<()>("create-answer", &[&None::<gst::Structure>, &promise]);
+                    .emit_by_name::<()>("create-answer", &[&None::<Structure>, &promise]);
             });
 
             Ok(())

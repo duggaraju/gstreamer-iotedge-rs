@@ -1,9 +1,6 @@
+extern crate log;
 #[macro_use]
-extern crate log as logger;
-#[macro_use]
-extern crate gst;
-#[macro_use]
-extern crate glib;
+extern crate gstreamer;
 #[macro_use]
 extern crate std;
 #[macro_use]
@@ -26,9 +23,10 @@ use crate::iot::IotModule;
 use crate::media::MediaPipeline;
 use crate::settings::Settings;
 use anyhow::{Error, Result};
+use log::info;
 use std::process;
 
-fn plugin_init(plugin: &gst::Plugin) -> Result<(), glib::BoolError> {
+fn plugin_init(plugin: &gstreamer::Plugin) -> Result<(), gstreamer::glib::BoolError> {
     plugins::register(plugin)?;
     Ok(())
 }
@@ -53,9 +51,9 @@ async fn main() -> Result<(), Error> {
         std::env::set_var("media_root", "/tmp");
     }
 
-    gst::init()?;
+    gstreamer::init()?;
     plugin_register_static()?;
-    let main_loop = glib::MainLoop::new(None, false);
+    let main_loop = gstreamer::glib::MainLoop::new(None, false);
     info!("Initialized gstreamer");
 
     if let Some(_) = std::env::var_os("IOTEDGE_WORKLOADURI") {

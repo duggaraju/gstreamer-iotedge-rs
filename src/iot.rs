@@ -3,8 +3,8 @@ use crate::Settings;
 use anyhow::Error;
 use azure_iot_rs::message::IotHubMessage;
 use azure_iot_rs::module::{IotHubModuleClient, IotHubModuleEvent};
+use log::info;
 use serde_json::Value;
-
 use tokio::task;
 
 #[derive(Clone)]
