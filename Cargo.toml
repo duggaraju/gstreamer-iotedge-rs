@@ -27,7 +27,7 @@ shellexpand = "3.1.0"
 anyhow = "1.0.71"
 ctrlc = "3.4.0"
 
-gstreamer-sdp = { version = "0.20.0", features = ["v1_16"] }
+gstreamer-sdp = { version = "0.20.0", features = ["v1_20"] }
 gstreamer-rtsp = { version = "0.20.0", features = ["v1_20"] }
 gstreamer-rtsp-server = {  version = "0.20.0", features = ["v1_20"] }
 gstreamer-webrtc = { version = "0.20.0", features = ["v1_20"] }
