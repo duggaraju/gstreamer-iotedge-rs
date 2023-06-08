@@ -11,12 +11,13 @@ use gstreamer::glib::subclass::prelude::*;
 use gstreamer::glib::{self, Object, Value};
 use gstreamer::{
     Bin, ClockTime, Element, ElementFactory, Message, MessageRef, MessageView, Pipeline,
-    PluginFeature, Registry, SeekFlags, SeekType, ELEMENT_METADATA_KLASS,
+    Registry, SeekFlags, SeekType, ELEMENT_METADATA_KLASS,
 };
 use gstreamer_rtsp_server::prelude::*;
 use gstreamer_rtsp_server::subclass::prelude::*;
 
 #[derive(Default, Debug)]
+#[allow(dead_code)]
 pub struct ReplayBinImpl {
     pt: u32,
     path: String,
@@ -138,7 +139,6 @@ unsafe impl Sync for Media {}
 // This is the private data of our factory
 #[derive(Default, Debug)]
 pub struct FactoryImpl {
-    payloaders: Vec<PluginFeature>,
     path: String,
 }
 
@@ -164,13 +164,9 @@ impl ObjectSubclass for FactoryImpl {
             false,
         );
         info!("Found {} payloders", 0);
-        let media_root = std::env::var("media_root")
-            .unwrap_or(String::from("/media/"));
+        let media_root = std::env::var("media_root").unwrap_or(String::from("/media/"));
 
-        Self {
-            payloaders: Vec::new(),
-            path: media_root,
-        }
+        Self { path: media_root }
     }
 }
 

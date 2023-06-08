@@ -47,13 +47,13 @@ impl RtspContext {
 
         if let Some(ref videosrc) = context.videosrc {
             if let Some(ref videosink) = context.videosink {
-                context.connect_sink_source(videosink, &videosrc);
+                context.connect_sink_source(videosink, videosrc);
             }
         }
 
         if let Some(ref audiosrc) = context.audiosrc {
             if let Some(ref audiosink) = context.audiosink {
-                context.connect_sink_source(audiosink, &audiosrc);
+                context.connect_sink_source(audiosink, audiosrc);
             }
         }
     }

@@ -1,6 +1,6 @@
 [package]
 name = "gstreamer-iotedge-rs"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["krishndu"]
 edition = "2021"
 description = "Azure IOT Edge module to run a gStreamer pipeline"
@@ -17,7 +17,7 @@ serde_derive = "1.0.163"
 env_logger = "0.10.0"
 config = "0.13.0"
 
-azure-iot-rs = "0.3.0"
+azure-iot-rs = "0.4.0"
 
 warp = "0.3.5"
 

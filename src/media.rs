@@ -21,6 +21,17 @@ pub struct AppSinks {
     pub clock: Option<Clock>,
 }
 
+impl Drop for MediaPipeline {
+    fn drop(&mut self) {
+        if let Some(ref pipeline) = self.pipeline {
+            pipeline
+                .set_state(State::Null)
+                .expect("failed to set pipeline to null");
+            self.pipeline = None;
+        }
+    }
+}
+
 impl MediaPipeline {
     pub fn new() -> Self {
         MediaPipeline {
@@ -42,15 +53,6 @@ impl MediaPipeline {
             videosink: None,
             audiosink: None,
             clock: None,
-        }
-    }
-
-    pub fn close(&mut self) {
-        if let Some(ref pipeline) = self.pipeline {
-            pipeline
-                .set_state(State::Null)
-                .expect("failed to set pipeline to null");
-            self.pipeline = None;
         }
     }
 
@@ -128,7 +130,7 @@ impl MediaPipeline {
         if http {
             let appsinks = self.get_appsinks();
             task::spawn(async move {
-                let _server = WebServer::start(pipeline, appsinks).await;
+                WebServer::start(pipeline, appsinks).await;
             });
         }
     }

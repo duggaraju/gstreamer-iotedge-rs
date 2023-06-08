@@ -2,6 +2,7 @@ use crate::MediaPipeline;
 use crate::Settings;
 use anyhow::Error;
 use azure_iot_rs::message::IotHubMessage;
+use azure_iot_rs::message::MessageBody;
 use azure_iot_rs::module::{IotHubModuleClient, IotHubModuleEvent};
 use log::info;
 use serde_json::Value;
@@ -29,14 +30,18 @@ impl IotModule {
     }
 
     fn handle_twin(&mut self, settings: Value) -> Result<(), &'static str> {
-        let desired = Settings::from_json(settings);
+        let desired = Settings::from_json_value(settings);
         self.pipeline.update(desired);
         Ok(())
     }
 
-    fn handle_message(&self, message: IotHubMessage) -> Result<(), &'static str> {
-        info!("Received hub message {}", message.content_type());
-        return Ok(());
+    fn handle_message(&mut self, message: IotHubMessage) -> Result<(), &'static str> {
+        let body: MessageBody<'_> = message.body();
+        info!("Received hub message {:?}", body);
+        if let MessageBody::Text(s) = body {
+            self.settings = Settings::from_json(s).ok();
+        }
+        Ok(())
     }
 
     pub async fn start() -> Result<(), Error> {

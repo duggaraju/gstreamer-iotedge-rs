@@ -238,6 +238,23 @@ glib::wrapper! {
 unsafe impl Send for InferencePlugin {}
 unsafe impl Sync for InferencePlugin {}
 
+fn plugin_init(plugin: &gstreamer::Plugin) -> Result<(), gstreamer::glib::BoolError> {
+    register(plugin)?;
+    Ok(())
+}
+
+plugin_define!(
+    test,
+    env!("CARGO_PKG_DESCRIPTION"),
+    plugin_init,
+    concat!(env!("CARGO_PKG_VERSION")),
+    "MIT/X11",
+    env!("CARGO_PKG_NAME"),
+    env!("CARGO_PKG_NAME"),
+    env!("CARGO_PKG_REPOSITORY"),
+    "BUILD_REL_DATE"
+);
+
 // Registers the type for our element, and then registers in GStreamer under
 // the name "rsInferencePlugin" for being able to instantiate it via e.g.
 // ElementFactory::make().

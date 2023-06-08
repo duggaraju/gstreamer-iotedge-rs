@@ -16,7 +16,7 @@ use std::sync::mpsc::{sync_channel, SyncSender};
 use futures::{SinkExt, StreamExt};
 use tokio::task;
 
-use anyhow::Error;
+use anyhow::{bail, Error};
 use warp::ws::Message;
 use warp::Filter;
 
@@ -69,7 +69,7 @@ impl WebRtcContext {
             .by_name_recurse_up("webrtcbin")
             .expect("missing element by name webrtcbin");
         let client = WebRtcContext {
-            sender: sender,
+            sender,
             webrtcbin: webrtcbin.clone(),
         };
 
@@ -304,6 +304,7 @@ pub struct WebServer {
 }
 
 impl WebServer {
+
     async fn handle_webscoket(pipeline: String, socket: warp::ws::WebSocket) {
         info!("Staring a web socket session for pipeline: {}", pipeline);
         // let pipeline = String::new();
@@ -315,7 +316,7 @@ impl WebServer {
             loop {
                 let next = reader.next().await;
 
-                if let None = next {
+                if next.is_none() {
                     break;
                 }
                 let msg = next.unwrap().ok();

@@ -9,7 +9,11 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn from_json(settings: Value) -> Self {
+    pub fn from_json(value: &str) -> serde_json::Result<Self> {
+        serde_json::from_str::<Value>(value).map(Settings::from_json_value)
+    }
+
+    pub fn from_json_value(settings: Value) -> Self {
         let desired = settings["desired"]
             .as_object()
             .expect("Expected desired settings!");
