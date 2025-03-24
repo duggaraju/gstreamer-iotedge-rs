@@ -17,12 +17,11 @@ mod webrtc;
 use crate::media::MediaPipeline;
 use crate::settings::Settings;
 use crate::{iot::IotModule, plugins::plugin_register_static};
-use anyhow::{Error, Result};
 use log::info;
 use std::{env, process};
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     //ensure media root is always set.
     if env::var_os("media_root").is_none() {
@@ -41,13 +40,12 @@ async fn main() -> Result<(), Error> {
         // Run as a normal container..
         let settings = Settings::from_env();
         let mut pipeline = MediaPipeline::new();
-        pipeline.update(settings);
+        pipeline.update(settings)?;
     }
     ctrlc::set_handler(|| {
         info!("Terminating on Ctrl+C");
         process::exit(-1);
-    })
-    .expect("Error setting Ctrl-C handler");
+    })?;
 
     main_loop.run();
     Ok(())

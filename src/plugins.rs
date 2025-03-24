@@ -30,7 +30,7 @@ impl InferencePluginImpl {
         pad: &Pad,
         buffer: Buffer,
     ) -> Result<gstreamer::FlowSuccess, gstreamer::FlowError> {
-        log!(CAT, obj: pad, "Handling buffer {:?}", buffer);
+        log!(CAT, obj = pad, "Handling buffer {:?}", buffer);
         self.srcpad.push(buffer)
     }
 
@@ -42,7 +42,7 @@ impl InferencePluginImpl {
     // See the documentation of Event and EventRef to see what can be done with
     // events, and especially the EventView type for inspecting events.
     fn sink_event(&self, pad: &Pad, event: Event) -> bool {
-        log!(CAT, obj: pad, "Handling event {:?}", event);
+        log!(CAT, obj = pad, "Handling event {:?}", event);
         self.srcpad.push_event(event)
     }
 
@@ -56,7 +56,7 @@ impl InferencePluginImpl {
     // See the documentation of Query and QueryRef to see what can be done with
     // queries, and especially the QueryView type for inspecting and modifying queries.
     fn sink_query(&self, pad: &Pad, query: &mut QueryRef) -> bool {
-        log!(CAT, obj: pad, "Handling query {:?}", query);
+        log!(CAT, obj = pad, "Handling query {:?}", query);
         self.srcpad.peer_query(query)
     }
 
@@ -69,7 +69,7 @@ impl InferencePluginImpl {
     // See the documentation of Event and EventRef to see what can be done with
     // events, and especially the EventView type for inspecting events.
     fn src_event(&self, pad: &Pad, event: Event) -> bool {
-        log!(CAT, obj: pad, "Handling event {:?}", event);
+        log!(CAT, obj = pad, "Handling event {:?}", event);
         self.sinkpad.push_event(event)
     }
 
@@ -83,7 +83,7 @@ impl InferencePluginImpl {
     // See the documentation of Query and QueryRef to see what can be done with
     // queries, and especially the QueryView type for inspecting and modifying queries.
     fn src_query(&self, pad: &Pad, query: &mut QueryRef) -> bool {
-        log!(CAT, obj: pad, "Handling query {:?}", query);
+        log!(CAT, obj = pad, "Handling query {:?}", query);
         self.sinkpad.peer_query(query)
     }
 }
@@ -111,7 +111,7 @@ impl ObjectSubclass for InferencePluginImpl {
         //
         // Details about what each function is good for is next to each function definition
         let templ = klass.pad_template("sink").unwrap();
-        let sinkpad = Pad::builder_with_template(&templ, Some("sink"))
+        let sinkpad = Pad::builder_from_template(&templ)
             .chain_function(|pad, parent, buffer| {
                 InferencePluginImpl::catch_panic_pad_function(
                     parent,
@@ -136,7 +136,7 @@ impl ObjectSubclass for InferencePluginImpl {
             .build();
 
         let templ = klass.pad_template("src").unwrap();
-        let srcpad = Pad::builder_with_template(&templ, Some("src"))
+        let srcpad = Pad::builder_from_template(&templ)
             .event_function(|pad, parent, event| {
                 InferencePluginImpl::catch_panic_pad_function(
                     parent,
@@ -224,7 +224,7 @@ impl ElementImpl for InferencePluginImpl {
         &self,
         transition: StateChange,
     ) -> Result<StateChangeSuccess, StateChangeError> {
-        trace!(CAT, imp: self, "Changing state {:?}", transition);
+        trace!(CAT, imp = self, "Changing state {:?}", transition);
 
         // Call the parent class' implementation of ::change_state()
         self.parent_change_state(transition)
@@ -262,7 +262,7 @@ pub fn register(plugin: &Plugin) -> Result<(), glib::BoolError> {
     Element::register(
         Some(plugin),
         "inference",
-        Rank::None,
+        Rank::NONE,
         InferencePlugin::static_type(),
     )
 }

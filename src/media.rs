@@ -2,7 +2,7 @@ use crate::rtsp::RtspContext;
 use crate::webrtc::WebServer;
 use crate::Settings;
 use gstreamer::{
-    parse_launch_full, prelude::*, Bin, Clock, Element, MessageView, ParseContext, ParseError,
+    glib::ControlFlow, prelude::*, Bin, Clock, Element, MessageView, ParseContext,
     ParseFlags, State,
 };
 use log::{error, info};
@@ -15,10 +15,11 @@ pub struct MediaPipeline {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct AppSinks {
     pub audiosink: Option<Element>,
     pub videosink: Option<Element>,
-    pub clock: Option<Clock>,
+    clock: Option<Clock>,
 }
 
 impl Drop for MediaPipeline {
@@ -56,76 +57,65 @@ impl MediaPipeline {
         }
     }
 
-    fn start(&mut self, pipeline: &str) {
+    fn start(&mut self, pipeline: &str) -> anyhow::Result<()> {
         info!("expanding environemnt variables in pipeline: {}", pipeline);
-        let expanded_pipeline = shellexpand::env(pipeline).unwrap();
+        let expanded_pipeline = shellexpand::env(pipeline)?;
         let mut context = ParseContext::new();
-        let pipeline =
-            parse_launch_full(&expanded_pipeline, Some(&mut context), ParseFlags::empty());
-        if let Err(err) = pipeline {
-            if let Some(ParseError::NoSuchElement) = err.kind::<ParseError>() {
-                error!("Missing element(s): {:?}", context.missing_elements());
-            } else {
-                error!("Failed to parse pipeline: {}", err);
-            }
-            return;
-        }
+        let pipeline = gstreamer::parse::launch_full(
+            &expanded_pipeline,
+            Some(&mut context),
+            ParseFlags::empty(),
+        )?;
 
-        pipeline
-            .as_ref()
-            .unwrap()
-            .set_state(State::Playing)
-            .expect("Unable to set the pipeline to the `Playing` state");
-        self.pipeline = pipeline.ok();
+        pipeline.set_state(State::Playing)?;
+        self.pipeline = Some(pipeline);
         info!("started media pipeline...");
-        self.process();
+        self.process()
     }
 
-    fn process(&self) {
-        let pipeline = self.pipeline.as_ref().unwrap().clone();
+    fn process(&self) -> anyhow::Result<()> {
+        let pipeline = self
+            .pipeline
+            .as_ref()
+            .ok_or(anyhow::format_err!("No pipeline"))?
+            .clone();
         let bus = pipeline
             .bus()
             .expect("Failed to get the bus from pipeline!");
-        bus.add_watch(move |_, msg| {
-            let cont = match msg.view() {
-                MessageView::Eos(..) => {
-                    error!("Received EOS on the pipeline!");
-                    pipeline
-                        .set_state(State::Null)
-                        .expect("Unable to set the pipeline to the `Null` state");
-                    false
-                }
-                MessageView::Error(err) => {
-                    error!(
-                        "Error from {:?}: {} ({:?})",
-                        err.src().map(|s| s.path_string()),
-                        err.error(),
-                        err.debug()
-                    );
-                    false
-                }
-                _ => true,
-            };
-            gstreamer::glib::Continue(cont)
-        })
-        .expect("Failed to add watch!");
+        let _ = bus.add_watch(move |_, msg| match msg.view() {
+            MessageView::Eos(..) => {
+                error!("Received EOS on the pipeline!");
+                pipeline
+                    .set_state(State::Null)
+                    .expect("Unable to set the pipeline to the `Null` state");
+                ControlFlow::Break
+            }
+            MessageView::Error(err) => {
+                error!(
+                    "Error from {:?}: {} ({:?})",
+                    err.src().map(|s| s.path_string()),
+                    err.error(),
+                    err.debug()
+                );
+                ControlFlow::Break
+            }
+            _ => ControlFlow::Continue,
+        })?;
+        Ok(())
     }
 
-    pub fn update(&mut self, settings: Settings) {
+    pub fn update(&mut self, settings: Settings) -> anyhow::Result<()> {
         if let Some(ref pipeline) = settings.pipeline {
-            self.start(pipeline);
+            self.start(pipeline)?;
         }
 
         if let Some(ref pipeline) = settings.rtsp_pipeline {
             let rtsp_context = RtspContext::new(self.get_appsinks());
-            rtsp_context.start(pipeline);
+            rtsp_context.start(pipeline)?;
         }
 
         let http = settings.http_server;
-        let pipeline = settings
-            .webrtc_pipeline
-            .as_ref()
-            .map_or(String::new(), String::from);
+        let pipeline = settings.webrtc_pipeline.clone().unwrap_or_default();
         self.settings = Some(settings);
         if http {
             let appsinks = self.get_appsinks();
@@ -133,5 +123,6 @@ impl MediaPipeline {
                 WebServer::start(pipeline, appsinks).await;
             });
         }
+        Ok(())
     }
 }

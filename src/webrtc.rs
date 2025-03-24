@@ -3,8 +3,8 @@ extern crate serde_derive;
 
 use gstreamer::glib::Object;
 use gstreamer::{
-    element_error, parse_launch_full, prelude::*, promise, Bin, Element, LibraryError,
-    ParseContext, ParseError, ParseFlags, Promise, PromiseError, State, Structure, StructureRef,
+    element_error, prelude::*, promise, Bin, Element, LibraryError, ParseContext, ParseError,
+    ParseFlags, Promise, PromiseError, State, Structure, StructureRef,
 };
 use log::{error, info};
 use serde_derive::{Deserialize, Serialize};
@@ -49,8 +49,11 @@ impl WebRtcContext {
         let expanded_pipeline = shellexpand::env(&pipeline).unwrap();
         info!("expanded Web RTC  pipeline: {}", expanded_pipeline);
         let mut context = ParseContext::new();
-        let element =
-            parse_launch_full(&expanded_pipeline, Some(&mut context), ParseFlags::empty());
+        let element = gstreamer::parse::launch_full(
+            &expanded_pipeline,
+            Some(&mut context),
+            ParseFlags::empty(),
+        );
         if let Err(err) = element {
             if let Some(ParseError::NoSuchElement) = err.kind::<ParseError>() {
                 error!("Missing element(s): {:?}", context.missing_elements());
@@ -299,12 +302,12 @@ impl WebRtcContext {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct WebServer {
     webrtc_pipeline: String,
 }
 
 impl WebServer {
-
     async fn handle_webscoket(pipeline: String, socket: warp::ws::WebSocket) {
         info!("Staring a web socket session for pipeline: {}", pipeline);
         // let pipeline = String::new();
@@ -349,7 +352,7 @@ impl WebServer {
         send.await.unwrap();
     }
 
-    pub async fn start(webrtc_pipeline: String, appsinks: AppSinks) {
+    pub async fn start(webrtc_pipeline: String, _appsinks: AppSinks) {
         info!("Initializing HTTP server...");
         let root_dir = Path::new("wwwroot");
         let root = warp::path("wwwroot").and(warp::fs::dir(root_dir));

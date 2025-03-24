@@ -6,12 +6,11 @@ extern crate std;
 
 use std::path::Path;
 
-use anyhow::{Error, Result};
 use gstreamer::glib::subclass::prelude::*;
 use gstreamer::glib::{self, Object, Value};
 use gstreamer::{
-    Bin, ClockTime, Element, ElementFactory, Message, MessageRef, MessageView, Pipeline,
-    Registry, SeekFlags, SeekType, ELEMENT_METADATA_KLASS,
+    Bin, ClockTime, Element, ElementFactory, Message, MessageRef, MessageView, Pipeline, Registry,
+    SeekFlags, SeekType, ELEMENT_METADATA_KLASS,
 };
 use gstreamer_rtsp_server::prelude::*;
 use gstreamer_rtsp_server::subclass::prelude::*;
@@ -252,11 +251,12 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         if pipeline.is_some() {
             let _pipeline = pipeline.as_ref().unwrap().clone();
             let bus = _pipeline.bus().unwrap();
-            bus.add_watch(move |_, mesg| {
-                info!("Received message {:?}", mesg);
-                glib::Continue(true)
-            })
-            .unwrap();
+            _ = bus
+                .add_watch(move |_, mesg| {
+                    info!("Received message {:?}", mesg);
+                    glib::ControlFlow::Continue
+                })
+                .expect("msg bus error");
         }
         pipeline
     }
@@ -322,7 +322,7 @@ impl Default for MountPoints {
     }
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     gstreamer::init()?;
     let main_loop = glib::MainLoop::new(None, false);

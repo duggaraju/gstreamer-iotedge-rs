@@ -1,12 +1,13 @@
 use crate::media::AppSinks;
+use anyhow::Context;
 use gstreamer::{
     prelude::{Cast, ObjectExt},
-    traits::{ElementExt, GstBinExt},
+    prelude::{ElementExt, GstBinExt},
     Bin, Clock, Element,
 };
 use gstreamer_rtsp_server::{
     prelude::RTSPServerExtManual,
-    traits::{RTSPMediaExt, RTSPMediaFactoryExt, RTSPMountPointsExt, RTSPServerExt},
+    prelude::{RTSPMediaExt, RTSPMediaFactoryExt, RTSPMountPointsExt, RTSPServerExt},
     RTSPMedia, RTSPMediaFactory, RTSPServer,
 };
 use log::info;
@@ -58,12 +59,12 @@ impl RtspContext {
         }
     }
 
-    pub fn start(&self, pipeline: &str) {
+    pub fn start(&self, pipeline: &str) -> anyhow::Result<()> {
         let rtsp_pipeline = shellexpand::env(pipeline).unwrap();
         info!("expanded RTSP pipeline: {}", rtsp_pipeline);
 
         let server = RTSPServer::default();
-        let mounts = server.mount_points().unwrap();
+        let mounts = server.mount_points().context("no mount points")?;
         let factory = RTSPMediaFactory::default();
         factory.set_launch(&rtsp_pipeline);
         factory.set_shared(true);
@@ -81,11 +82,12 @@ impl RtspContext {
 
         let _id = server.attach(None);
 
-        let address = server.address().unwrap();
+        let address = server.address().context("Failed to get server address")?;
         info!(
             "Stream ready at rtsp://{}:{}/player",
-            address.as_str(),
+            address,
             server.bound_port()
         );
+        Ok(())
     }
 }

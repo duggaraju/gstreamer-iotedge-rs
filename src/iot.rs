@@ -29,13 +29,13 @@ impl IotModule {
         };
     }
 
-    fn handle_twin(&mut self, settings: Value) -> Result<(), &'static str> {
+    fn handle_twin(&mut self, settings: Value) -> anyhow::Result<()> {
         let desired = Settings::from_json_value(settings);
-        self.pipeline.update(desired);
+        self.pipeline.update(desired)?;
         Ok(())
     }
 
-    fn handle_message(&mut self, message: IotHubMessage) -> Result<(), &'static str> {
+    fn handle_message(&mut self, message: IotHubMessage) -> anyhow::Result<()> {
         let body: MessageBody<'_> = message.body();
         info!("Received hub message {:?}", body);
         if let MessageBody::Text(s) = body {
