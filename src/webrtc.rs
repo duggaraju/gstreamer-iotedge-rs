@@ -8,7 +8,6 @@ use gstreamer::{
 };
 use log::{error, info};
 use serde_derive::{Deserialize, Serialize};
-use std::path::Path;
 use std::result::Result;
 use std::str;
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -19,8 +18,6 @@ use tokio::task;
 use anyhow::{bail, Error};
 use warp::ws::Message;
 use warp::Filter;
-
-use crate::media::AppSinks;
 
 #[derive(Clone)]
 pub struct WebRtcContext {
@@ -47,7 +44,7 @@ enum JsonMsg {
 impl WebRtcContext {
     pub fn start(pipeline: String, sender: SyncSender<Message>) -> anyhow::Result<WebRtcContext> {
         let expanded_pipeline = shellexpand::env(&pipeline).unwrap();
-        info!("expanded Web RTC  pipeline: {}", expanded_pipeline);
+        info!("expanded Web RTC  pipeline: {expanded_pipeline}");
         let mut context = ParseContext::new();
         let element = gstreamer::parse::launch_full(
             &expanded_pipeline,
@@ -58,7 +55,7 @@ impl WebRtcContext {
             if let Some(ParseError::NoSuchElement) = err.kind::<ParseError>() {
                 error!("Missing element(s): {:?}", context.missing_elements());
             } else {
-                error!("Failed to parse pipeline: {}", err);
+                error!("Failed to parse pipeline: {err}");
             }
             return Err(anyhow!("Failed to created webrtc pipeline!"));
         }
@@ -119,7 +116,7 @@ impl WebRtcContext {
         let reply = match reply {
             Ok(reply) => reply,
             Err(err) => {
-                bail!("Offer creation future got no reponse: {:?}", err);
+                bail!("Offer creation future got no reponse: {err:?}");
             }
         };
 
@@ -190,7 +187,7 @@ impl WebRtcContext {
     pub fn process_message(&self, message: Message) -> anyhow::Result<()> {
         let msg = message.to_str().unwrap();
         if msg.starts_with("ERROR") {
-            bail!("Got error message: {}", msg);
+            bail!("Got error message: {msg}");
         }
 
         let json_msg: JsonMsg = serde_json::from_str(msg)?;
@@ -217,7 +214,7 @@ impl WebRtcContext {
         let reply = match reply {
             Ok(reply) => reply,
             Err(err) => {
-                bail!("Answer creation future got no reponse: {:?}", err);
+                bail!("Answer creation future got no reponse: {err:?}");
             }
         };
 
@@ -248,7 +245,7 @@ impl WebRtcContext {
 
     fn handle_sdp(&self, type_: &str, sdp: &str) -> Result<(), Error> {
         if type_ == "answer" {
-            info!("Received answer: {}\n", sdp);
+            info!("Received answer: {sdp}\n");
 
             let ret = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())
                 .map_err(|_| anyhow!("Failed to parse SDP answer"))?;
@@ -260,7 +257,7 @@ impl WebRtcContext {
 
             Ok(())
         } else if type_ == "offer" {
-            info!("Received offer:\n{}\n", sdp);
+            info!("Received offer:\n{sdp}\n");
 
             let ret = gstreamer_sdp::SDPMessage::parse_buffer(sdp.as_bytes())
                 .map_err(|_| anyhow!("Failed to parse SDP offer"))?;
@@ -296,7 +293,7 @@ impl WebRtcContext {
 
             Ok(())
         } else {
-            bail!("Sdp type is not \"answer\" but \"{}\"", type_)
+            bail!("Sdp type is not \"answer\" but \"{type_}\"")
         }
     }
 }
@@ -309,7 +306,7 @@ pub struct WebServer {
 
 impl WebServer {
     async fn handle_webscoket(pipeline: String, socket: warp::ws::WebSocket) {
-        info!("Staring a web socket session for pipeline: {}", pipeline);
+        info!("Staring a web socket session for pipeline: {pipeline}");
         // let pipeline = String::new();
         let (mut writer, mut reader) = socket.split();
         let (sender, receiver) = sync_channel::<Message>(1);
@@ -343,7 +340,7 @@ impl WebServer {
         loop {
             let message = receiver.recv();
             if let Err(e) = message {
-                error!("Error sending message {}", e);
+                error!("Error sending message {e}");
                 break;
             }
             writer.send(message.unwrap()).await.unwrap();
@@ -352,31 +349,29 @@ impl WebServer {
         send.await.unwrap();
     }
 
-    pub async fn start(webrtc_pipeline: String, _appsinks: AppSinks) {
+    pub async fn start(webrtc_pipeline: String) {
         info!("Initializing HTTP server...");
-        let root_dir = Path::new("wwwroot");
-        let root = warp::path("wwwroot").and(warp::fs::dir(root_dir));
+        let root = warp::path("wwwroot").and(warp::fs::dir("wwwroot"));
 
-        let media_path = std::env::var("media_root").unwrap_or(String::from("/tmp"));
+        let media_path = std::env::var("media_root").unwrap_or_else(|_| String::from("/tmp"));
         let media = warp::path("media").and(warp::fs::dir(media_path));
 
         let use_ws = !webrtc_pipeline.is_empty();
+        let webrtc_pipeline_clone = webrtc_pipeline.clone();
 
         // If web rtc is enabled allow web sockets.
         let ws = warp::path("ws")
-            .and_then(move || async move {
-                if use_ws {
-                    Ok(true)
-                } else {
-                    Err(warp::reject::not_found())
-                }
-            })
             .and(warp::ws())
-            .map(move |_, ws: warp::ws::Ws| {
-                let pipeline = webrtc_pipeline.clone();
-                ws.on_upgrade(|ws| async move {
-                    WebServer::handle_webscoket(pipeline, ws).await;
-                })
+            .and_then(move |ws: warp::ws::Ws| {
+                if use_ws {
+                    let pipeline = webrtc_pipeline_clone.clone();
+                    let upgrade = ws.on_upgrade(|socket| async move {
+                        WebServer::handle_webscoket(pipeline, socket).await;
+                    });
+                    futures::future::ok::<_, warp::Rejection>(upgrade)
+                } else {
+                    futures::future::err(warp::reject::not_found())
+                }
             });
 
         info!("started http server....");

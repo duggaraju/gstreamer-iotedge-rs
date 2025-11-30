@@ -1,6 +1,27 @@
-FROM ubuntu
+# select image
+FROM rust:latest AS build
+
 ENV DEBIAN_FRONTEND=noninteractive 
-RUN apt-get update && apt-get install -y libcurl4 libssl1.1 libuuid1 \
-    libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad libgstrtspserver-1.0
-COPY target/release/gstreamer-iotedge-rs /usr/local/bin/
+RUN apt-get update && apt-get install -y \
+    build-essential clang libclang-dev llvm-dev \
+    libcurl4 libssl-dev libuuid1 cmake \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+    gstreamer1.0-libav libgstrtspserver-1.0-dev 
+
+# copy your source tree
+WORKDIR /usr/app
+COPY . .
+
+# build for release
+RUN cargo build --release
+RUN cargo install --path .
+
+FROM ubuntu:latest
+# FROM arm64v8/ubuntu:latest AS base
+#FROM arm32v7/ubuntu:latest AS base
+
+ENV DEBIAN_FRONTEND=noninteractive 
+RUN apt-get update && apt-get install -y libcurl4 libuuid1 \
+    libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad libgstrtspserver-1.0 gstreamer1.0-nice
+COPY --from=build /usr/local/cargo/bin/gstreamer-iotedge-rs /usr/local/bin/
 ENTRYPOINT [ "gstreamer-iotedge-rs" ]

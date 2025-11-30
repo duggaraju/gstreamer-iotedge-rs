@@ -2,11 +2,10 @@ use crate::rtsp::RtspContext;
 use crate::webrtc::WebServer;
 use crate::Settings;
 use gstreamer::{
-    glib::ControlFlow, prelude::*, Bin, Clock, Element, MessageView, ParseContext,
-    ParseFlags, State,
+    glib::ControlFlow, prelude::*, Bin, Clock, Element, MessageView, ParseContext, ParseFlags,
+    State,
 };
 use log::{error, info};
-use tokio::task;
 
 #[derive(Clone)]
 pub struct MediaPipeline {
@@ -58,7 +57,7 @@ impl MediaPipeline {
     }
 
     fn start(&mut self, pipeline: &str) -> anyhow::Result<()> {
-        info!("expanding environemnt variables in pipeline: {}", pipeline);
+        info!("expanding environemnt variables in pipeline: {pipeline}");
         let expanded_pipeline = shellexpand::env(pipeline)?;
         let mut context = ParseContext::new();
         let pipeline = gstreamer::parse::launch_full(
@@ -118,9 +117,11 @@ impl MediaPipeline {
         let pipeline = settings.webrtc_pipeline.clone().unwrap_or_default();
         self.settings = Some(settings);
         if http {
-            let appsinks = self.get_appsinks();
-            task::spawn(async move {
-                WebServer::start(pipeline, appsinks).await;
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async move {
+                    WebServer::start(pipeline).await;
+                });
             });
         }
         Ok(())

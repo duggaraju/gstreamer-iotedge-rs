@@ -61,7 +61,7 @@ impl RtspContext {
 
     pub fn start(&self, pipeline: &str) -> anyhow::Result<()> {
         let rtsp_pipeline = shellexpand::env(pipeline).unwrap();
-        info!("expanded RTSP pipeline: {}", rtsp_pipeline);
+        info!("expanded RTSP pipeline: {rtsp_pipeline}");
 
         let server = RTSPServer::default();
         let mounts = server.mount_points().context("no mount points")?;

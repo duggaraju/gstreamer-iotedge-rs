@@ -61,7 +61,7 @@ impl BinImpl for ReplayBinImpl {
 }
 
 glib::wrapper! {
-    pub struct ReplayBin(ObjectSubclass<ReplayBinImpl>) @extends Element, Bin;
+    pub struct ReplayBin(ObjectSubclass<ReplayBinImpl>) @extends Bin, Element, gstreamer::Object;
 }
 
 unsafe impl Send for ReplayBin {}

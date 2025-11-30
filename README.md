@@ -84,6 +84,15 @@ example:
 ```
 
 # Building Code
+## Install dependencies.
+```sh
+sudo apt update && 
+sudo apt install -y \
+    build-essential clang libclang-dev llvm-dev \
+    libcurl4 libssl-dev libuuid1 cmake \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
+    gstreamer1.0-libav libgstrtspserver-1.0-dev 
+```
 ## Local Build.
 Assuming you have [rust](https://www.rust-lang.org/tools/install) tooling installed. All you need is
 ```sh

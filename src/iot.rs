@@ -1,9 +1,7 @@
 use crate::MediaPipeline;
 use crate::Settings;
 use anyhow::Error;
-use azure_iot_rs::message::IotHubMessage;
-use azure_iot_rs::message::MessageBody;
-use azure_iot_rs::module::{IotHubModuleClient, IotHubModuleEvent};
+use azure_iot_rs::{IotHubMessage, IotHubModuleClient, IotHubModuleEvent, MessageBody};
 use log::info;
 use serde_json::Value;
 use tokio::task;
@@ -37,7 +35,7 @@ impl IotModule {
 
     fn handle_message(&mut self, message: IotHubMessage) -> anyhow::Result<()> {
         let body: MessageBody<'_> = message.body();
-        info!("Received hub message {:?}", body);
+        info!("Received hub message {body:?}");
         if let MessageBody::Text(s) = body {
             self.settings = Settings::from_json(s).ok();
         }
