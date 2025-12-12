@@ -9,8 +9,8 @@ use std::path::Path;
 use gstreamer::glib::subclass::prelude::*;
 use gstreamer::glib::{self, Object, Value};
 use gstreamer::{
-    Bin, ClockTime, Element, ElementFactory, Message, MessageRef, MessageView, Pipeline, Registry,
-    SeekFlags, SeekType, ELEMENT_METADATA_KLASS,
+    Bin, ClockTime, ELEMENT_METADATA_KLASS, Element, ElementFactory, Message, MessageRef,
+    MessageView, Pipeline, Registry, SeekFlags, SeekType,
 };
 use gstreamer_rtsp_server::prelude::*;
 use gstreamer_rtsp_server::subclass::prelude::*;
@@ -50,11 +50,11 @@ impl ObjectImpl for ReplayBinImpl {}
 impl BinImpl for ReplayBinImpl {
     fn handle_message(&self, message: Message) {
         let view = message.view();
-        info!("Received message by bin: {:?}", view);
+        debug!("Received message by bin: {view:?}");
         if let MessageView::SegmentDone(_d) = view {
             warn!("Bin Segment Done bye!!");
         } else if let MessageView::StreamCollection(streams) = view {
-            info!("Received stream collection {:?}", streams);
+            debug!("Received stream collection {streams:?}");
         }
         self.parent_handle_message(message)
     }
@@ -92,9 +92,9 @@ impl ObjectImpl for MediaImpl {}
 // Implementation of gst_rtsp_server::RTSPMedia virtual methods
 impl RTSPMediaImpl for MediaImpl {
     fn handle_message(&self, message: &MessageRef) -> bool {
-        //info!("Media received message {:?}", message.view());
+        //debug!("Media received message {:?}", message.view());
         if let MessageView::SegmentDone(d) = message.view() {
-            warn!("Media EOS. segment done. !! {:?}", d);
+            warn!("Media EOS. segment done. !! {d:?}");
             let bin = self.obj().element();
             bin.seek(
                 1.0,
@@ -110,7 +110,7 @@ impl RTSPMediaImpl for MediaImpl {
     }
 
     fn prepared(&self) {
-        info!("Media is prepared do a seek");
+        debug!("Media is prepared do a seek");
         let bin = self.obj().element();
         bin.seek(
             1.0,
@@ -162,7 +162,7 @@ impl ObjectSubclass for FactoryImpl {
             },
             false,
         );
-        info!("Found {} payloders", 0);
+        debug!("Found {} payloders", 0);
         let media_root = std::env::var("media_root").unwrap_or(String::from("/media/"));
 
         Self { path: media_root }
@@ -182,12 +182,12 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
     fn create_element(&self, url: &gstreamer_rtsp::RTSPUrl) -> Option<Element> {
         let uri = url.request_uri();
         let components = url.decode_path_components();
-        info!(
+        debug!(
             "Creating media for Base path: {} , URL {}, components: {:?}",
             self.path, uri, components
         );
         let file = Path::new(&self.path).join(components[2].as_str());
-        info!("Mapped URL {} to path {:?}", uri, file);
+        debug!("Mapped URL {uri} to path {file:?}");
 
         if !file.exists() {
             return None;
@@ -219,7 +219,7 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         parser.connect_pad_added(move |demux, src_pad| {
             let caps = src_pad.current_caps().unwrap_or(src_pad.query_caps(None));
             let name = caps.structure(0).unwrap().name();
-            info!(
+            debug!(
                 "Added pad {} to {} caps: {:?}",
                 src_pad.name(),
                 demux.name(),
@@ -232,7 +232,7 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
         });
 
         parser.connect("autoplug-query", false, |args| -> Option<Value> {
-            info!(
+            debug!(
                 "Auto plug query called!! {:?} {:?} {:?}",
                 args[0], args[1], args[2]
             );
@@ -240,8 +240,8 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
             Some(false.to_value())
         });
 
-        bin.add_many(&[&src, &parser, &pay]).unwrap();
-        Element::link_many(&[&src, &parser]).unwrap();
+        bin.add_many([&src, &parser, &pay]).unwrap();
+        Element::link_many([&src, &parser]).unwrap();
 
         Some(bin.upcast())
     }
@@ -253,7 +253,7 @@ impl RTSPMediaFactoryImpl for FactoryImpl {
             let bus = _pipeline.bus().unwrap();
             _ = bus
                 .add_watch(move |_, mesg| {
-                    info!("Received message {:?}", mesg);
+                    debug!("Received message {mesg:?}");
                     glib::ControlFlow::Continue
                 })
                 .expect("msg bus error");
@@ -299,7 +299,7 @@ impl RTSPMountPointsImpl for MountPointsImpl {
     fn make_path(&self, url: &gstreamer_rtsp::RTSPUrl) -> Option<glib::GString> {
         let path = url.decode_path_components();
         let uri = url.request_uri();
-        info!("Make path called for {} {} {:?}", uri, path.len(), path);
+        debug!("Make path called for {} {} {:?}", uri, path.len(), path);
         if path[1].as_str() == "media" && path.len() >= 2 {
             Some(glib::GString::from("/media"))
         } else {
@@ -326,7 +326,7 @@ fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     gstreamer::init()?;
     let main_loop = glib::MainLoop::new(None, false);
-    info!("Initialized gstreamer");
+    debug!("Initialized gstreamer");
 
     let server = gstreamer_rtsp_server::RTSPServer::new();
     let mounts = MountPoints::default();
@@ -339,7 +339,7 @@ fn main() -> anyhow::Result<()> {
     mounts.add_factory("/media", factory);
     let id = server.attach(None)?;
 
-    info!(
+    debug!(
         "Started RTSP server. Make a request for rtsp://0.0.0.0:{}/media/filename.mp4",
         server.bound_port()
     );

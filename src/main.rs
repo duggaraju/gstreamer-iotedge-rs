@@ -23,10 +23,6 @@ use std::{env, process};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    //ensure media root is always set.
-    if env::var_os("media_root").is_none() {
-        env::set_var("media_root", "/tmp");
-    }
 
     gstreamer::init()?;
     plugin_register_static()?;

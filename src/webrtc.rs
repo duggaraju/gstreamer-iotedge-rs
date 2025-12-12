@@ -3,21 +3,21 @@ extern crate serde_derive;
 
 use gstreamer::glib::Object;
 use gstreamer::{
-    element_error, prelude::*, promise, Bin, Element, LibraryError, ParseContext, ParseError,
-    ParseFlags, Promise, PromiseError, State, Structure, StructureRef,
+    Bin, Element, LibraryError, ParseContext, ParseError, ParseFlags, Promise, PromiseError, State,
+    Structure, StructureRef, element_error, prelude::*, promise,
 };
 use log::{error, info};
 use serde_derive::{Deserialize, Serialize};
 use std::result::Result;
 use std::str;
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{SyncSender, sync_channel};
 
 use futures::{SinkExt, StreamExt};
 use tokio::task;
 
-use anyhow::{bail, Error};
-use warp::ws::Message;
+use anyhow::{Error, bail};
 use warp::Filter;
+use warp::ws::Message;
 
 #[derive(Clone)]
 pub struct WebRtcContext {
@@ -144,7 +144,7 @@ impl WebRtcContext {
         Ok(())
     }
 
-    fn on_negotiation_needed(&self) -> Result<(), failure::Error> {
+    fn on_negotiation_needed(&self) -> Result<(), anyhow::Error> {
         info!("Creating negotiation offer");
 
         let client = self.clone();
@@ -164,7 +164,7 @@ impl WebRtcContext {
         Ok(())
     }
 
-    fn on_ice_candidate(&self, mlineindex: u32, candidate: String) -> Result<(), failure::Error> {
+    fn on_ice_candidate(&self, mlineindex: u32, candidate: String) -> Result<(), anyhow::Error> {
         let message = serde_json::to_string(&JsonMsg::Ice {
             candidate,
             sdp_mline_index: mlineindex,

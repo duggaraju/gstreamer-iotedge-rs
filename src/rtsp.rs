@@ -1,14 +1,14 @@
 use crate::media::AppSinks;
 use anyhow::Context;
 use gstreamer::{
+    Bin, Clock, Element,
     prelude::{Cast, ObjectExt},
     prelude::{ElementExt, GstBinExt},
-    Bin, Clock, Element,
 };
 use gstreamer_rtsp_server::{
+    RTSPMedia, RTSPMediaFactory, RTSPServer,
     prelude::RTSPServerExtManual,
     prelude::{RTSPMediaExt, RTSPMediaFactoryExt, RTSPMountPointsExt, RTSPServerExt},
-    RTSPMedia, RTSPMediaFactory, RTSPServer,
 };
 use log::info;
 

@@ -1,9 +1,9 @@
+use crate::Settings;
 use crate::rtsp::RtspContext;
 use crate::webrtc::WebServer;
-use crate::Settings;
 use gstreamer::{
-    glib::ControlFlow, prelude::*, Bin, Clock, Element, MessageView, ParseContext, ParseFlags,
-    State,
+    Bin, Clock, Element, MessageView, ParseContext, ParseFlags, State, glib::ControlFlow,
+    prelude::*,
 };
 use log::{error, info};
 
